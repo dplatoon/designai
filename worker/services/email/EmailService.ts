@@ -32,8 +32,7 @@ function buildMimeEmail(
     ``,
     `--${boundary}--`,
   ];
-  return lines.join('\r
-');
+    return lines.join('\r\n');
 }
 
 // ---- OTP Generator -----------------------------------------------------------
