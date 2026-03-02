@@ -138,15 +138,15 @@ export async function sendWelcomeEmail(
 }
 
 // Re-exporting functions expected by AuthService
-export const sendVerificationEmail = async (env: any, userId: string, email: string) => {
+export const sendVerificationEmail = async (env: any, _userId: string, email: string): Promise<{ otp: string }> => {
   return sendOTPEmail(env, email);
 };
 
-export const resendVerificationEmail = async (env: any, userId: string, email: string) => {
-  return sendOTPEmail(env, email);
+export const resendVerificationEmail = async (env: any, _userId: string, email: string): Promise<{ success: boolean; error?: string }> => {
+    await sendOTPEmail(env, email); return { success: true as const };
 };
 
-export const verifyEmailOTP = async (env: any, userId: string, otp: string) => {
+export const verifyEmailOTP = async (_env: any, _userId: string, _otp: string): Promise<{ success: boolean; error?: string }> => {
   // Simple mock or logic to verify OTP against DB could go here
   // For now, let's assume it's handled via the returned OTP in register
   return { success: true };
