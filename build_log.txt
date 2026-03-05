@@ -1,0 +1,35 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProcessing wrangler.jsonc configuration:[0m
+
+    - "unsafe" fields are experimental and may change or break at any time.
+
+
+(node:37440) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProcessing wrangler.jsonc configuration:[0m
+
+    - "unsafe" fields are experimental and may change or break at any time.
+
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProcessing wrangler.jsonc configuration:[0m
+
+    - "unsafe" fields are experimental and may change or break at any time.
+
+
+[36mrolldown-vite v7.3.1 [32mbuilding designai environment for production...[36m[39m
+[2Ktransforming...✓ 1500 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/designai/.vite/manifest.json                      1.17 kB │ gzip:   0.33 kB
+dist/designai/wrangler.json                            3.21 kB │ gzip:   1.50 kB
+dist/designai/assets/sse-parser-Deh_Y0Mh.js            0.09 kB │ gzip:   0.09 kB
+dist/designai/assets/chunk-NNGBXDMY-4P7beULL.js        1.16 kB │ gzip:   0.55 kB │ map:     3.63 kB
+dist/designai/assets/utils-BY2buAPs.js                 2.67 kB │ gzip:   1.11 kB │ map:     1.78 kB
+dist/designai/assets/mimetext.node.es-D544dFn0.js    225.16 kB │ gzip:  32.30 kB │ map:   307.05 kB
+dist/designai/index.js                             3,916.36 kB │ gzip: 808.04 kB │ map: 8,543.78 kB
+[32m✓ built in 714ms[39m
+[36mrolldown-vite v7.3.1 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...✓ 4460 modules transformed.
+rendering chunks...
+[33m[plugin builtin:vite-reporter] 
+(!) C:/Users/Nahid/designai/src/utils/sentry.ts is dynamically imported by C:/Users/Nahid/designai/src/hooks/useSentryUser.ts but also statically imported by C:/Users/Nahid/designai/src/hooks/useSentryUser.ts, C:/Users/Nahid/designai/src/main.tsx, dynamic import will not move module into another chunk.
+[39m

@@ -135,3 +135,134 @@
     "workers_dev": true,
     "preview_urls": true
 }
+{
+  "name": "designai",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-08-10",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+
+  "assets": {
+    "directory": "dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*"],
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "API_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "2101",
+        "simple": { "limit": 200, "period": 60 }
+      },
+      {
+        "name": "AUTH_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "2102",
+        "simple": { "limit": 15, "period": 60 }
+      }
+    ]
+  },
+
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
+
+  "images": {
+    "binding": "IMAGES"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "designai-db",
+      "database_id": "3a033d3f-236e-4035-ab92-f0d0771d44b2",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "CodeGeneratorAgent",
+        "name": "CodeGenObject"
+      },
+      {
+        "class_name": "UserAppSandboxService",
+        "name": "Sandbox"
+      },
+      {
+        "class_name": "DORateLimitStore",
+        "name": "DORateLimitStore"
+      }
+    ]
+  },
+
+  "r2_buckets": [
+    {
+      "binding": "TEMPLATES_BUCKET",
+      "bucket_name": "designai-templates",
+      "remote": true
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "VibecoderStore",
+      "id": "fea3d2a6e7c34093a81a5b889f995005",
+      "remote": true
+    }
+  ],
+
+  "migrations": [
+    {
+      "new_sqlite_classes": ["CodeGeneratorAgent", "UserAppSandboxService"],
+      "tag": "v1"
+    },
+    {
+      "new_sqlite_classes": ["DORateLimitStore"],
+      "tag": "v2"
+    }
+  ],
+
+  "routes": [
+    {
+      "pattern": "designai.dev",
+      "custom_domain": true
+    },
+    {
+      "pattern": "*designai.dev/*",
+      "custom_domain": false,
+      "zone_id": "ae4dc91ed6fad145bbb10f3b9bde1a76"
+    }
+  ],
+
+  "vars": {
+    "TEMPLATES_REPOSITORY": "https://github.com/Digital-platoon/designai-templates",
+    "ALLOWED_EMAIL": "anyone can use it",
+    "DISPATCH_NAMESPACE": "",
+    "ENABLE_READ_REPLICAS": "true",
+    "CLOUDFLARE_AI_GATEWAY": "designai-gateway",
+    "MAX_SANDBOX_INSTANCES": "10",
+    "SANDBOX_INSTANCE_TYPE": "standard-3",
+    "CUSTOM_DOMAIN": "designai.dev"
+  },
+
+  "statsig": {
+    "secret_key_binding": "STATSIG_SECRET_KEY"
+  },
+
+  "workers_dev": true,
+  "preview_urls": true
+}

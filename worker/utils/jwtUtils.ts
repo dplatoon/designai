@@ -18,11 +18,11 @@ export class JWTUtils {
         this.jwtSecret = new TextEncoder().encode(jwtSecret);
     }
 
-    static getInstance(env: { JWT_SECRET: string }): JWTUtils {
+    static getInstance(env: { JWT_SECRET?: string }): JWTUtils {
         if (!env.JWT_SECRET) {
             throw new Error('JWT_SECRET not configured');
         }
-        
+
         if (!JWTUtils.instance) {
             JWTUtils.instance = new JWTUtils(env.JWT_SECRET);
         }
@@ -33,23 +33,23 @@ export class JWTUtils {
     //     if (secret.length < 32) {
     //         throw new Error('JWT_SECRET must be at least 32 characters long for security');
     //     }
-        
+
     //     const weakSecrets = ['default', 'secret', 'password', 'changeme', 'admin', 'test'];
     //     if (weakSecrets.includes(secret.toLowerCase())) {
     //         throw new Error('JWT_SECRET contains a weak/default value. Please use a cryptographically secure random string');
     //     }
-        
+
     //     const hasLowercase = /[a-z]/.test(secret);
     //     const hasUppercase = /[A-Z]/.test(secret);
     //     const hasNumbers = /[0-9]/.test(secret);
     //     const hasSpecial = /[^a-zA-Z0-9]/.test(secret);
-        
+
     //     const characterTypes = [hasLowercase, hasUppercase, hasNumbers, hasSpecial].filter(Boolean).length;
-        
+
     //     if (characterTypes < 3) {
     //         throw new Error('JWT_SECRET must contain at least 3 different character types');
     //     }
-        
+
     //     const hasRepeatingChars = /(.)\1{3,}/.test(secret);
     //     if (hasRepeatingChars) {
     //         throw new Error('JWT_SECRET contains repetitive patterns');
@@ -59,15 +59,15 @@ export class JWTUtils {
     async createToken(payload: Omit<TokenPayload, 'iat' | 'exp'>, expiresIn: number = 24 * 3600): Promise<string> {
         try {
             const now = Math.floor(Date.now() / 1000);
-            
+
             const jwt = new SignJWT({
                 ...payload,
                 iat: now,
                 exp: now + expiresIn
             })
-            .setProtectedHeader({ alg: this.algorithm })
-            .setIssuedAt(now)
-            .setExpirationTime(now + expiresIn);
+                .setProtectedHeader({ alg: this.algorithm })
+                .setIssuedAt(now)
+                .setExpirationTime(now + expiresIn);
 
             return await jwt.sign(this.jwtSecret);
         } catch (error) {
@@ -83,16 +83,16 @@ export class JWTUtils {
     async verifyToken(token: string): Promise<TokenPayload | null> {
         try {
             const { payload } = await jwtVerify(token, this.jwtSecret);
-            
+
             const now = Math.floor(Date.now() / 1000);
             if (payload.exp && payload.exp < now) {
                 return null;
             }
-            
+
             if (!payload.sub || !payload.email || !payload.type || !payload.exp || !payload.iat) {
                 return null;
             }
-            
+
             return {
                 sub: payload.sub as string,
                 email: payload.email as string,
@@ -112,14 +112,14 @@ export class JWTUtils {
         expiresIn: number;
     }> {
         const accessTokenExpiry = SessionService.config.sessionTTL;
-        
+
         const payload = { sub: userId, email, sessionId };
-        
+
         const accessToken = await this.createToken({
-                ...payload,
-                type: 'access' as const,
-            }, accessTokenExpiry);
-        
+            ...payload,
+            type: 'access' as const,
+        }, accessTokenExpiry);
+
         return { accessToken, expiresIn: accessTokenExpiry };
     }
 

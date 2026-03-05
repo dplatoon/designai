@@ -24,27 +24,19 @@ dist-ssr
 *.sln
 *.sw?
 
-# wrangler files
-.wrangler
+# Local configuration
 .dev.vars
 .prod.vars
-.env
-.env.*
+.wrangler
+wrangler.local.jsonc
 
 runner/downloads
 /generated/prisma
-
-/generated/prisma
 test.ts
 temp/
-
 templates
 debugging.ipynb
 
-#bun.lock
-#*.lock
-
-debug-tools/*.json
 # Sentry Config File
 .env.sentry-build-plugin
 data-dump

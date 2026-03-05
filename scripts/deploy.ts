@@ -15,6 +15,7 @@
 
 import { execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';
+import fs, { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { parse, modify, applyEdits } from 'jsonc-parser';
@@ -625,11 +626,13 @@ class CloudflareDeploymentManager {
 			}
 
 			// Make script executable - skip on Windows as chmod doesn't exist
+			// Make script executable (Unix only)
 			if (process.platform !== 'win32') {
 				try {
 					execSync(`chmod +x "${deployScript}"`, { cwd: templatesDir });
 				} catch (chmodError) {
 					console.warn(`⚠️  Failed to make script executable: ${chmodError instanceof Error ? chmodError.message : String(chmodError)}`);
+					console.warn('⚠️  Could not make script executable, attempting to run anyway');
 				}
 			}
 
@@ -642,7 +645,6 @@ class CloudflareDeploymentManager {
 				...process.env,
 				CLOUDFLARE_API_TOKEN: this.env.CLOUDFLARE_API_TOKEN,
 				CLOUDFLARE_ACCOUNT_ID: this.env.CLOUDFLARE_ACCOUNT_ID,
-				BUCKET_NAME: templatesBucket.bucket_name,
 				R2_BUCKET_NAME: templatesBucket.bucket_name,
 			};
 
@@ -650,10 +652,14 @@ class CloudflareDeploymentManager {
 			const deployCommand = process.platform === 'win32' ? `sh "${deployScript}"` : `./deploy_templates.sh`;
 
 			execSync(deployCommand, {
+			const nodeDeployScript = join(PROJECT_ROOT, 'scripts', 'deploy-templates.ts');
+
+			execSync(`npx tsx "${nodeDeployScript}"`, {
 				stdio: 'inherit',
-				cwd: templatesDir,
+				cwd: PROJECT_ROOT,
 				env: deployEnv,
 			});
+
 
 			console.log('✅ Templates deployed successfully to R2');
 		} catch (error) {
@@ -1513,18 +1519,42 @@ class CloudflareDeploymentManager {
 	 * Cleans Wrangler cache and build artifacts
 	 */
 	private cleanWranglerCache(): void {
-		console.log('🧹 Cleaning Wrangler cache and build artifacts...');
+		console.log('\n🧹 Cleaning Wrangler cache and build artifacts...');
 
 		try {
 			// Remove .wrangler directory (contains wrangler cache and state)
 			// Remove .wrangler directory
 			if (existsSync(join(PROJECT_ROOT, '.wrangler'))) {
 				rmSync(join(PROJECT_ROOT, '.wrangler'), { recursive: true, force: true });
+			if (existsSync(join(PROJECT_ROOT, '.wrangler'))) {
+				fs.rmSync(join(PROJECT_ROOT, '.wrangler'), { recursive: true, force: true });
 				console.log('   ✅ Removed .wrangler directory');
 			}
 
 			// Remove wrangler.json files from dist/* directories
 			console.log('   ℹ️  Skipping find-based cleanup on Windows');
+			// Use simple recursive search or just skip if complex on Windows
+			try {
+				if (existsSync(join(PROJECT_ROOT, 'dist'))) {
+					// Minimal cleanup of wrangler.json in dist
+					const cleanupWranglerJson = (dir: string) => {
+						const files = fs.readdirSync(dir);
+						for (const file of files) {
+							const filePath = join(dir, file);
+							if (fs.statSync(filePath).isDirectory()) {
+								cleanupWranglerJson(filePath);
+							} else if (file === 'wrangler.json') {
+								fs.unlinkSync(filePath);
+							}
+						}
+					};
+					cleanupWranglerJson(join(PROJECT_ROOT, 'dist'));
+					console.log('   ✅ Removed cached wrangler.json files from dist');
+				}
+			} catch (findError) {
+				// Non-critical - continue if cleanup fails
+				console.log('   ℹ️  No cached wrangler.json files found in dist or cleanup skipped');
+			}
 
 			console.log('✅ Cache cleanup completed');
 		} catch (error) {
@@ -1545,8 +1575,23 @@ class CloudflareDeploymentManager {
 		try {
 			// Run build
 			execSync('npm run build', {
+			// Check if bun exists
+			let buildCmd = 'bun run build';
+			try {
+				execSync('bun --version', { stdio: 'ignore' });
+			} catch {
+				console.log('ℹ️  Bun not found, falling back to npm');
+				buildCmd = 'npm run build';
+			}
+
+			// Run build with increased memory
+			execSync(buildCmd, {
 				stdio: 'inherit',
 				cwd: PROJECT_ROOT,
+				env: {
+					...process.env,
+					NODE_OPTIONS: '--max-old-space-size=4096'
+				}
 			});
 
 			console.log('✅ Project build completed');
@@ -1806,7 +1851,7 @@ class CloudflareDeploymentManager {
 				return;
 			}
 
-			execSync('wrangler secret bulk .prod.vars', {
+			execSync('npx wrangler secret bulk .prod.vars', {
 				stdio: 'inherit',
 				cwd: PROJECT_ROOT,
 			});
@@ -1906,6 +1951,15 @@ class CloudflareDeploymentManager {
 		try {
 			await execSync(
 				'npm run db:generate && npm run db:migrate:remote',
+			let migrateCmd = 'bun run db:generate && bun run db:migrate:remote';
+			try {
+				execSync('bun --version', { stdio: 'ignore' });
+			} catch {
+				migrateCmd = 'npm run db:generate && npm run db:migrate:remote';
+			}
+
+			await execSync(
+				migrateCmd,
 				{
 					stdio: 'inherit',
 					cwd: PROJECT_ROOT,
@@ -2090,6 +2144,7 @@ class CloudflareDeploymentManager {
 
 // Main execution
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
 	const deployer = new CloudflareDeploymentManager();
 	deployer.deploy().catch((error) => {
 		console.error('Unexpected error:', error);

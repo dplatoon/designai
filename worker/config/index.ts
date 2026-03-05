@@ -108,6 +108,7 @@ export async function getGlobalConfigurableSettings(env: Env): Promise<GlobalCon
     try {
         // Try to fetch override config from KV
         const storedConfigJson = await env.DesignAIStore.get(CONFIG_KEY);
+        const storedConfigJson = await env.VibecoderStore.get(CONFIG_KEY);
 
         if (!storedConfigJson) {
             // No stored config, use defaults
@@ -131,7 +132,7 @@ export async function getGlobalConfigurableSettings(env: Env): Promise<GlobalCon
     }
 }
 
-export async function getUserConfigurableSettings(env: Env, userId: string): Promise<GlobalConfigurableSettings> {
+export async function getUserConfigurableSettings(env: Env, userId: string | null): Promise<GlobalConfigurableSettings> {
     const globalConfig = await getGlobalConfigurableSettings(env);
     if (!userId) {
         return globalConfig;
@@ -145,6 +146,7 @@ export async function getUserConfigurableSettings(env: Env, userId: string): Pro
     try {
         // Try to fetch override config from KV
         const storedConfigJson = await env.DesignAIStore.get(`user_config:${userId}`);
+        const storedConfigJson = await env.VibecoderStore.get(`user_config:${userId}`);
 
         if (!storedConfigJson) {
             // No stored config, use defaults

@@ -46,7 +46,7 @@ export async function runnerFetch(url: string, method: 'GET' | 'POST' | 'DELETE'
 /**
  * Client for interacting with the Runner Service API.
  */
-export class RemoteSandboxServiceClient extends BaseSandboxService{
+export class RemoteSandboxServiceClient extends BaseSandboxService {
     private static sandboxServiceUrl: string;
     private static token: string;
 
@@ -82,11 +82,11 @@ export class RemoteSandboxServiceClient extends BaseSandboxService{
 
             if (!response.ok) {
                 const errorText = await response.text();
-                this.logger.error('Runner service request failed', { 
-                    status: response.status, 
-                    statusText: response.statusText, 
+                this.logger.error('Runner service request failed', {
+                    status: response.status,
+                    statusText: response.statusText,
                     errorText,
-                    url 
+                    url
                 });
                 return {
                     success: false,
@@ -95,7 +95,7 @@ export class RemoteSandboxServiceClient extends BaseSandboxService{
             }
 
             const responseData = await response.json();
-            if(!schema) return responseData;
+            if (!schema) return responseData;
             const validation = schema.safeParse(responseData);
 
             if (!validation.success) {
@@ -127,9 +127,9 @@ export class RemoteSandboxServiceClient extends BaseSandboxService{
      * Create a new runner instance.
      */
     async createInstance(templateName: string, projectName: string, webhookUrl?: string, localEnvVars?: Record<string, string>): Promise<BootstrapResponse> {
-        const requestBody: BootstrapRequest = { 
-            templateName, 
-            projectName, 
+        const requestBody: BootstrapRequest = {
+            templateName,
+            projectName,
             ...(webhookUrl && { webhookUrl }),
             ...(localEnvVars && { envVars: localEnvVars })
         };
@@ -255,4 +255,4 @@ export class RemoteSandboxServiceClient extends BaseSandboxService{
     }
 }
 
-RemoteSandboxServiceClient.init(env.SANDBOX_SERVICE_URL, env.SANDBOX_SERVICE_API_KEY);
+RemoteSandboxServiceClient.init((env as any).SANDBOX_SERVICE_URL || '', (env as any).SANDBOX_SERVICE_API_KEY || '');

@@ -1,0 +1,17 @@
+{
+	"name": "minimal-js",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"dev": "bun scripts/dev.ts",
+		"build": "wrangler build",
+		"deploy": "wrangler deploy",
+		"lint": "eslint --cache -f json --quiet ."
+	},
+	"dependencies": {},
+	"devDependencies": {},
+	"engines": {
+		"node": ">=18"
+	}
+}

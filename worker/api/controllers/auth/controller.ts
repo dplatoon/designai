@@ -13,18 +13,23 @@ import {
     oauthProviderSchema
 } from './authSchemas';
 import { SecurityError } from 'shared/types/errors';
+import { SecurityError, SecurityErrorType } from 'shared/types/errors';
 import {
     formatAuthResponse,
     mapUserResponse,
     setSecureAuthCookies,
     clearAuthCookies,
     extractSessionId
+    extractSessionId,
+    extractRequestMetadata
 } from '../../../utils/authUtils';
 import { RouteContext } from '../../types/route-context';
 import { authMiddleware } from '../../../middleware/auth/auth';
 import { CsrfService } from '../../../services/csrf/CsrfService';
 import { BaseController } from '../baseController';
 import { createLogger } from '../../../logger';
+import { OAuthProvider } from '../../../types/auth-types';
+import { revalidateStoredRedirectUrl } from '../../../utils/redirectValidation';
 /**
  * Authentication Controller
  */
@@ -81,6 +86,7 @@ export class AuthController extends BaseController {
         try {
             // Check if OAuth providers are configured - if yes, block email/password registration
             if (AuthController.hasOAuthProviders(env) && env.ENABLE_EMAIL_REGISTRATION !== 'true') {
+            if (AuthController.hasOAuthProviders(env)) {
                 return AuthController.createErrorResponse(
                     'Email/password registration is not available when OAuth providers are configured. To enable email registration set ENABLE_EMAIL_REGISTRATION=true or remove OAuth provider credentials.',
                     403
@@ -105,8 +111,17 @@ export class AuthController extends BaseController {
             const authService = new AuthService(env);
             const result = await authService.register(validatedData, request);
 
+            //             if (env.ALLOWED_EMAIL && validatedData.email !== env.ALLOWED_EMAIL) {
+            // return AuthController.createErrorResponse(
+            // 'Email Whitelisting is enabled. Please use the allowed email to register.',
+            // 403
+            // );
+            // }
+            //             
+            const authService = new AuthService(env);
+            const result = await authService.register(validatedData, request);
             const response = AuthController.createSuccessResponse(
-                formatAuthResponse(result.user, result.sessionId, result.expiresAt)
+                formatAuthResponse(result.user, result.sessionId, result.expiresAt, result.requiresEmailVerification)
             );
 
             setSecureAuthCookies(response, {
@@ -115,7 +130,7 @@ export class AuthController extends BaseController {
             });
 
             // Rotate CSRF token on successful registration if configured
-            if (CsrfService.defaults.rotateOnAuth) {
+            if (CsrfService.getDefaults(env).rotateOnAuth) {
                 CsrfService.rotateToken(response);
             }
 
@@ -137,6 +152,7 @@ export class AuthController extends BaseController {
         try {
             // Check if OAuth providers are configured - if yes, block email/password login
             if (AuthController.hasOAuthProviders(env) && env.ENABLE_EMAIL_REGISTRATION !== 'true') {
+            if (AuthController.hasOAuthProviders(env)) {
                 return AuthController.createErrorResponse(
                     'Email/password login is not available when OAuth providers are configured. To enable email login set ENABLE_EMAIL_REGISTRATION=true or remove OAuth provider credentials.',
                     403
@@ -157,12 +173,18 @@ export class AuthController extends BaseController {
                     403
                 );
             }
+            //             if (env.ALLOWED_EMAIL && validatedData.email !== env.ALLOWED_EMAIL) {
+            // return AuthController.createErrorResponse(
+            // 'Email Whitelisting is enabled. Please use the allowed email to login.',
+            // 403
+            // );
+            //             }
 
             const authService = new AuthService(env);
             const result = await authService.login(validatedData, request);
 
             const response = AuthController.createSuccessResponse(
-                formatAuthResponse(result.user, result.sessionId, result.expiresAt)
+                formatAuthResponse(result.user, result.sessionId, result.expiresAt, result.requiresEmailVerification)
             );
 
             setSecureAuthCookies(response, {
@@ -171,7 +193,7 @@ export class AuthController extends BaseController {
             });
 
             // Rotate CSRF token on successful login if configured
-            if (CsrfService.defaults.rotateOnAuth) {
+            if (CsrfService.getDefaults(env).rotateOnAuth) {
                 CsrfService.rotateToken(response);
             }
 
@@ -371,6 +393,9 @@ export class AuthController extends BaseController {
 
             // Use stored redirect URL or default to home page
             const redirectLocation = result.redirectUrl || `${baseUrl}/`;
+            // Re-validate the stored URL at point-of-use (defense-in-depth)
+            const safeRedirect = revalidateStoredRedirectUrl(result.redirectUrl, request);
+            const redirectLocation = safeRedirect ? `${baseUrl}${safeRedirect}` : `${baseUrl}/`;
 
             // Create redirect response with secure auth cookies
             const response = new Response(null, {
@@ -596,7 +621,7 @@ export class AuthController extends BaseController {
             const result = await authService.verifyEmailWithOtp(email, otp, request);
 
             const response = AuthController.createSuccessResponse(
-                formatAuthResponse(result.user, result.sessionId, result.expiresAt)
+                formatAuthResponse(result.user, result.sessionId, result.expiresAt, result.requiresEmailVerification)
             );
 
             setSecureAuthCookies(response, {
@@ -707,18 +732,18 @@ export class AuthController extends BaseController {
      * Get CSRF token with proper expiration and rotation
      * GET /api/auth/csrf-token
      */
-    static async getCsrfToken(request: Request, _env: Env, _ctx: ExecutionContext, _routeContext: RouteContext): Promise<Response> {
+    static async getCsrfToken(request: Request, env: Env, _ctx: ExecutionContext, _routeContext: RouteContext): Promise<Response> {
         try {
             const token = CsrfService.getOrGenerateToken(request, false);
 
             const response = AuthController.createSuccessResponse({
                 token,
-                headerName: CsrfService.defaults.headerName,
-                expiresIn: Math.floor(CsrfService.defaults.tokenTTL / 1000)
+                headerName: CsrfService.getDefaults(env).headerName,
+                expiresIn: Math.floor(CsrfService.getDefaults(env).tokenTTL / 1000)
             });
 
             // Set the token in cookie with proper expiration
-            const maxAge = Math.floor(CsrfService.defaults.tokenTTL / 1000);
+            const maxAge = Math.floor(CsrfService.getDefaults(env).tokenTTL / 1000);
             CsrfService.setTokenCookie(response, token, maxAge);
 
             return response;
@@ -752,11 +777,11 @@ export class AuthController extends BaseController {
                 hasOAuth: providers.google || providers.github,
                 requiresEmailAuth: !providers.google && !providers.github,
                 csrfToken,
-                csrfExpiresIn: Math.floor(CsrfService.defaults.tokenTTL / 1000)
+                csrfExpiresIn: Math.floor(CsrfService.getDefaults(env).tokenTTL / 1000)
             });
 
             // Set CSRF token cookie with proper expiration
-            const maxAge = Math.floor(CsrfService.defaults.tokenTTL / 1000);
+            const maxAge = Math.floor(CsrfService.getDefaults(env).tokenTTL / 1000);
             CsrfService.setTokenCookie(response, csrfToken, maxAge);
 
             return response;

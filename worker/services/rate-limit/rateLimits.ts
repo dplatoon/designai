@@ -189,12 +189,14 @@ export class RateLimitService {
         env: Env,
         config: RateLimitSettings,
         user: AuthUser,
+        user: AuthUser | null,
         request: Request
     ): Promise<void> {
         if (!config[RateLimitType.APP_CREATION].enabled) {
             return;
         }
         const identifier = await this.getUserIdentifier(user);
+        const identifier = await this.getUniversalIdentifier(user, request);
 
         const key = this.buildRateLimitKey(RateLimitType.APP_CREATION, identifier);
 
@@ -235,6 +237,11 @@ export class RateLimitService {
         config: RateLimitSettings,
         user: AuthUser,
     ): Promise<void> {
+
+        if (!config[RateLimitType.LLM_CALLS].enabled) {
+            return;
+        }
+
 
         if (!config[RateLimitType.LLM_CALLS].enabled) {
             return;
