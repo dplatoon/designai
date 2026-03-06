@@ -91,6 +91,19 @@ export function createApp(env: Env): Hono<AppEnv> {
     // Now setup all the routes
     setupRoutes(app);
 
+    // Add global error handler
+    app.onError((err, c) => {
+        console.error('FATAL HONO ERROR:', err);
+        return c.json({
+            success: false,
+            error: {
+                type: 'INTERNAL_SERVER_ERROR',
+                message: err.message || 'An unexpected error occurred',
+                stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+            }
+        }, 500);
+    });
+
     // Add not found route to redirect to ASSETS
     app.notFound((c) => {
         return c.env.ASSETS.fetch(c.req.raw);

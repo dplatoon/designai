@@ -479,6 +479,7 @@ export class SandboxSdkClient extends BaseSandboxService {
             const instances: InstanceDetails[] = [];
 
             // Parse the combined output
+            const sections = bulkResult.stdout.split('===FILE:').filter((section: string) => section.trim());
             const sections = bulkResult.stdout.split('===FILE:').filter(section => section.trim());
 
             for (const section of sections) {
@@ -859,7 +860,7 @@ export class SandboxSdkClient extends BaseSandboxService {
             try {
                 const wranglerConfigFile = await sandbox.readFile(`${instanceId}/wrangler.jsonc`);
                 if (wranglerConfigFile.success) {
-                    await env.VibecoderStore.put(this.getWranglerKVKey(instanceId), wranglerConfigFile.content);
+                    await env.DesignAIStore.put(this.getWranglerKVKey(instanceId), wranglerConfigFile.content);
                     this.logger.info('Wrangler configuration stored in KV', { instanceId });
                 } else {
                     this.logger.warn('Could not read wrangler.jsonc for KV storage', { instanceId });
@@ -907,6 +908,7 @@ export class SandboxSdkClient extends BaseSandboxService {
                         }
                     }
 
+                    if (env.USE_TUNNEL_FOR_PREVIEW) {
                     if ((env as any).USE_TUNNEL_FOR_PREVIEW === 'true') {
                         this.logger.info('Using tunnel url instead for preview as configured', { instanceId, tunnelURL });
                         previewURL = tunnelURL;
@@ -1013,7 +1015,7 @@ export class SandboxSdkClient extends BaseSandboxService {
                     error: 'Failed to setup instance'
                 };
             }
-            results = setupResult;
+            const results = setupResult;
             // Store instance metadata
             const metadata = {
                 templateName: templateName,
@@ -1288,7 +1290,7 @@ export class SandboxSdkClient extends BaseSandboxService {
                 // Read '.important_files.json' in instance directory
                 const importantFiles = await sandbox.exec(`cd ${templateOrInstanceId} && jq -r '.[]' .important_files.json | while read -r path; do if [ -d "$path" ]; then find "$path" -type f; elif [ -f "$path" ]; then echo "$path"; fi; done`);
                 this.logger.info(`Read important files: stdout: ${importantFiles.stdout}, stderr: ${importantFiles.stderr}`);
-                filePaths = importantFiles.stdout.split('\n').filter(path => path);
+                filePaths = importantFiles.stdout.split('\n').filter((path: string) => path);
                 if (!filePaths) {
                     return {
                         success: false,
@@ -1518,7 +1520,7 @@ export class SandboxSdkClient extends BaseSandboxService {
 
     async clearInstanceErrors(instanceId: string): Promise<ClearErrorsResponse> {
         try {
-            let clearedCount = 0;
+            const clearedCount = 0;
 
             // Try enhanced error system first - clear ALL errors
             try {
@@ -1821,6 +1823,7 @@ export class SandboxSdkClient extends BaseSandboxService {
 
             // Step 2: Parse wrangler config from KV
             this.logger.info('Reading wrangler configuration from KV');
+            const wranglerConfigContent = await env.DesignAIStore.get(this.getWranglerKVKey(instanceId));
             let wranglerConfigContent = await env.VibecoderStore.get(this.getWranglerKVKey(instanceId));
 
             if (!wranglerConfigContent) {
@@ -1860,6 +1863,7 @@ export class SandboxSdkClient extends BaseSandboxService {
                     // Find all JS files in the worker assets directory
                     const findResult = await sandbox.exec(`find ${workerAssetsPath} -type f -name "*.js"`);
                     if (findResult.exitCode === 0) {
+                        const modulePaths = findResult.stdout.trim().split('\n').filter((path: string) => path);
                         const modulePaths = findResult.stdout.trim().split('\n').filter(path => path);
 
                         if (modulePaths.length > 0) {
@@ -1988,6 +1992,7 @@ export class SandboxSdkClient extends BaseSandboxService {
             throw new Error(`Failed to list assets: ${findResult.stderr}`);
         }
 
+        const filePaths = findResult.stdout.trim().split('\n').filter((path: string) => path);
         const filePaths = findResult.stdout.trim().split('\n').filter(path => path);
         this.logger.info('Asset files found', { count: filePaths.length });
 
@@ -2056,6 +2061,7 @@ export class SandboxSdkClient extends BaseSandboxService {
         // Remove control characters, limit length, and escape special characters
         const sanitizedMessage = commitMessage
             .substring(0, 500) // Limit message length
+            // eslint-disable-next-line no-control-regex
             .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
             .replace(/[`$\\]/g, '\\$&') // Escape backticks, dollar signs, and backslashes
             .replace(/"/g, '\\"') // Escape double quotes

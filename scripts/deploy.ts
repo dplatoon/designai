@@ -14,9 +14,10 @@
  */
 
 import { execSync } from 'child_process';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import fs, { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { parse, modify, applyEdits } from 'jsonc-parser';
 import Cloudflare from 'cloudflare';
 
@@ -624,11 +625,13 @@ class CloudflareDeploymentManager {
 				return;
 			}
 
+			// Make script executable - skip on Windows as chmod doesn't exist
 			// Make script executable (Unix only)
 			if (process.platform !== 'win32') {
 				try {
 					execSync(`chmod +x "${deployScript}"`, { cwd: templatesDir });
 				} catch (chmodError) {
+					console.warn(`⚠️  Failed to make script executable: ${chmodError instanceof Error ? chmodError.message : String(chmodError)}`);
 					console.warn('⚠️  Could not make script executable, attempting to run anyway');
 				}
 			}
@@ -645,6 +648,10 @@ class CloudflareDeploymentManager {
 				R2_BUCKET_NAME: templatesBucket.bucket_name,
 			};
 
+			// On Windows, use 'sh' or 'bash' to run the script if available
+			const deployCommand = process.platform === 'win32' ? `sh "${deployScript}"` : `./deploy_templates.sh`;
+
+			execSync(deployCommand, {
 			const nodeDeployScript = join(PROJECT_ROOT, 'scripts', 'deploy-templates.ts');
 
 			execSync(`npx tsx "${nodeDeployScript}"`, {
@@ -977,8 +984,8 @@ class CloudflareDeploymentManager {
 
 		// Only update workers_dev and preview_urls if not preserving existing flags
 		if (!preserveExistingFlags) {
-			updatedContent = this.updateWranglerField(updatedContent, 'workers_dev', false);
-			updatedContent = this.updateWranglerField(updatedContent, 'preview_urls', false);
+			updatedContent = this.updateWranglerField(updatedContent, 'workers_dev', true);
+			updatedContent = this.updateWranglerField(updatedContent, 'preview_urls', true);
 		}
 
 		return updatedContent;
@@ -1049,7 +1056,16 @@ class CloudflareDeploymentManager {
 			}
 
 			// Safely detect zone information for main domain
-			const { zoneId, success: zoneDetectionSuccess } = await this.safeDetectZoneForDomain(customDomain, originalCustomDomain);
+			let zoneId: string | null = process.env.CLOUDFLARE_ZONE_ID || null;
+			let zoneDetectionSuccess = !!zoneId;
+
+			if (zoneId) {
+				console.log(`📋 Using CLOUDFLARE_ZONE_ID from environment: ${zoneId}`);
+			} else {
+				const detection = await this.safeDetectZoneForDomain(customDomain, originalCustomDomain);
+				zoneId = detection.zoneId;
+				zoneDetectionSuccess = detection.success;
+			}
 
 			// If we have a custom preview domain, detect its zone information for wildcard routes
 			let previewZoneName: string | null = null;
@@ -1507,12 +1523,16 @@ class CloudflareDeploymentManager {
 
 		try {
 			// Remove .wrangler directory (contains wrangler cache and state)
+			// Remove .wrangler directory
+			if (existsSync(join(PROJECT_ROOT, '.wrangler'))) {
+				rmSync(join(PROJECT_ROOT, '.wrangler'), { recursive: true, force: true });
 			if (existsSync(join(PROJECT_ROOT, '.wrangler'))) {
 				fs.rmSync(join(PROJECT_ROOT, '.wrangler'), { recursive: true, force: true });
 				console.log('   ✅ Removed .wrangler directory');
 			}
 
 			// Remove wrangler.json files from dist/* directories
+			console.log('   ℹ️  Skipping find-based cleanup on Windows');
 			// Use simple recursive search or just skip if complex on Windows
 			try {
 				if (existsSync(join(PROJECT_ROOT, 'dist'))) {
@@ -1553,6 +1573,8 @@ class CloudflareDeploymentManager {
 		console.log('🔨 Building project...');
 
 		try {
+			// Run build
+			execSync('npm run build', {
 			// Check if bun exists
 			let buildCmd = 'bun run build';
 			try {
@@ -1927,6 +1949,8 @@ class CloudflareDeploymentManager {
 	private async runDatabaseMigrations(): Promise<void> {
 		console.log('Running database migrations...');
 		try {
+			await execSync(
+				'npm run db:generate && npm run db:migrate:remote',
 			let migrateCmd = 'bun run db:generate && bun run db:migrate:remote';
 			try {
 				execSync('bun --version', { stdio: 'ignore' });
@@ -1940,6 +1964,7 @@ class CloudflareDeploymentManager {
 					stdio: 'inherit',
 					cwd: PROJECT_ROOT,
 					encoding: 'utf8',
+					env: { ...process.env, CI: 'true' }
 				}
 			);
 		} catch (error) {
@@ -2103,7 +2128,7 @@ class CloudflareDeploymentManager {
 			);
 			console.error('   - Verify the templates repository is accessible');
 			console.error(
-				'   - Check that bun is installed and build script works',
+				'   - Check that node/npm is installed and build script works',
 			);
 
 			process.exit(1);
@@ -2118,6 +2143,7 @@ class CloudflareDeploymentManager {
 }
 
 // Main execution
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 if (import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
 	const deployer = new CloudflareDeploymentManager();
 	deployer.deploy().catch((error) => {

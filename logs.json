@@ -1,0 +1,1041 @@
+{
+    "wallTime": 23,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/ui-radix-De7ADfHK.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499445
+        }
+    ],
+    "eventTimestamp": 1772667499138,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/ui-radix-De7ADfHK.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd9f3dba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"d7ae45104251be42e023ccb87ed81674\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 21,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/utils-Uicf-ujK.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499443
+        }
+    ],
+    "eventTimestamp": 1772667499139,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/utils-Uicf-ujK.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd8f37ba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"8fe6a4ed8f45c35ddca1032d7a787fbf\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 24,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/animation-CXGQgKhK.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499444
+        }
+    ],
+    "eventTimestamp": 1772667499140,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/animation-CXGQgKhK.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd8f38ba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"186423f1200745b3ae5848e8f87115b4\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 12,
+    "cpuTime": 1,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/index-DM-EYgOT.css"
+            ],
+            "level": "log",
+            "timestamp": 1772667499760
+        }
+    ],
+    "eventTimestamp": 1772667499140,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/index-DM-EYgOT.css",
+            "method": "GET",
+            "headers": {
+                "accept": "text/css,*/*;q=0.1",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd8f36ba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"c0037a7b47e59db5c4195d6d03a76c1f\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=0",
+                "referer": "https://designai.hasantawhid2096.workers.dev/chat/new?query=Create%20a%20Todo%20list%20app&agentMode=deterministic",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "style",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 22,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/parser-md-BSiglo2N.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499444
+        }
+    ],
+    "eventTimestamp": 1772667499141,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/parser-md-BSiglo2N.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd9f3cba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"fc69b3b2d3cb4183aa28965f33f06b4b\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 37,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/monaco-BPK6MzUf.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499443
+        }
+    ],
+    "eventTimestamp": 1772667499142,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/monaco-BPK6MzUf.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd8f3aba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"fb381a84abba048868ea071fabf34c5b\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 24,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/rolldown-runtime-DDUpfMIz.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499444
+        }
+    ],
+    "eventTimestamp": 1772667499141,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/rolldown-runtime-DDUpfMIz.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd9f3bba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"5f128f4cbb060f31ee2d29d5a6533978\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 20,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/react-core-AOUYQn_P.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499443
+        }
+    ],
+    "eventTimestamp": 1772667499139,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/react-core-AOUYQn_P.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd8f39ba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"bcff4b7095ba49112abbb4c4ba068843\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 21,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/ui-icons-BROgTjX-.js"
+            ],
+            "level": "log",
+            "timestamp": 1772667499444
+        }
+    ],
+    "eventTimestamp": 1772667499153,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/ui-icons-BROgTjX-.js",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd8f35ba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"ea81c9806423f1ff1f8c6d3f31f48c99\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=1",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "script",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "requestHeaderNames": {},
+                "httpProtocol": "HTTP/3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "continent": "AS",
+                "asn": 134113,
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "verifiedBotCategory": "",
+                "country": "BD",
+                "isEUCountry": false,
+                "region": "Mymensingh Division",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientAuth": {
+                    "certIssuerDNLegacy": "",
+                    "certIssuerSKI": "",
+                    "certSubjectDNRFC2253": "",
+                    "certSubjectDNLegacy": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certSKI": "",
+                    "certSerial": "",
+                    "certIssuerDN": "",
+                    "certVerified": "NONE",
+                    "certNotAfter": "",
+                    "certSubjectDN": "",
+                    "certPresented": "0",
+                    "certRevoked": "0",
+                    "certIssuerSerial": "",
+                    "certIssuerDNRFC2253": "",
+                    "certFingerprintSHA1": ""
+                },
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientHelloLength": "1760",
+                "colo": "DAC",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestPriority": "",
+                "postalCode": "2210",
+                "city": "Mymensingh",
+                "tlsVersion": "TLSv1.3",
+                "regionCode": "H",
+                "asOrganization": "Millennium Computers & Networking",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY="
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}
+{
+    "wallTime": 18,
+    "cpuTime": 1,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
+    },
+    "scriptName": "designai",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+        {
+            "message": [
+                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/monaco-B9WiNxkw.css"
+            ],
+            "level": "log",
+            "timestamp": 1772667499441
+        }
+    ],
+    "eventTimestamp": 1772667499137,
+    "event": {
+        "request": {
+            "url": "https://designai.hasantawhid2096.workers.dev/assets/monaco-B9WiNxkw.css",
+            "method": "GET",
+            "headers": {
+                "accept": "text/css,*/*;q=0.1",
+                "accept-encoding": "gzip, br",
+                "accept-language": "en-US,en;q=0.9",
+                "cf-connecting-ip": "103.52.135.166",
+                "cf-ipcountry": "BD",
+                "cf-ray": "9d74b6bd8f34ba4d",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "cookie": "REDACTED",
+                "host": "designai.hasantawhid2096.workers.dev",
+                "if-none-match": "W/\"3a4425575b4c8bf5434843c9e0ad9c6b\"",
+                "origin": "https://designai.hasantawhid2096.workers.dev",
+                "priority": "u=0",
+                "referer": "https://designai.hasantawhid2096.workers.dev/chat/new?query=Create%20a%20Todo%20list%20app&agentMode=deterministic",
+                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "style",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "103.52.135.166"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/3",
+                "clientAcceptEncoding": "gzip, deflate, br",
+                "requestPriority": "",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 0,
+                "colo": "DAC",
+                "asn": 134113,
+                "asOrganization": "Millennium Computers & Networking",
+                "country": "BD",
+                "isEUCountry": false,
+                "city": "Mymensingh",
+                "continent": "AS",
+                "region": "Mymensingh Division",
+                "regionCode": "H",
+                "timezone": "Asia/Dhaka",
+                "longitude": "90.40646",
+                "latitude": "24.75636",
+                "postalCode": "2210",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES128-GCM-SHA256",
+                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
+                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
+                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientHelloLength": "1760",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": ""
+                },
+                "verifiedBotCategory": ""
+            }
+        },
+        "response": {
+            "status": 304
+        }
+    }
+}

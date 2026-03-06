@@ -4,15 +4,14 @@ import { applyDiff } from '../diff-formats/udiff';
 import { extractCommands } from '../../utils/common';
 
 // SCOF-specific parsing state with comprehensive tracking
-export interface SCOFParsingState extends ParsingState {
-}
+export type SCOFParsingState = ParsingState;
 
 /**
  * SCOF (Shell Command Output Format) implementation with robust chunk handling
  * Handles arbitrary chunk boundaries, mixed formats, and ensures single callback calls per file
  */
 export class SCOFFormat extends CodeGenerationFormat {
-    
+
     parseStreamingChunks(
         chunk: string,
         state: CodeGenerationStreamingState,
@@ -24,27 +23,27 @@ export class SCOFFormat extends CodeGenerationFormat {
         if (!state.parsingState || !this.isValidSCOFState(state.parsingState)) {
             state.parsingState = this.initializeSCOFState();
         }
-        
+
         const scofState = state.parsingState as SCOFParsingState;
-        
+
         // Add new chunk to accumulator
         state.accumulator += chunk;
-        
+
         // Process the accumulated content with robust chunk handling
         this.processAccumulatedContent(state, scofState, onFileOpen, onFileChunk, onFileClose);
-        
+
         return state;
     }
-    
+
     private isValidSCOFState(parsingState: any): parsingState is SCOFParsingState {
         return parsingState &&
-               typeof parsingState.currentMode === 'string' &&
-               parsingState.openedFiles instanceof Set &&
-               parsingState.closedFiles instanceof Set &&
-               typeof parsingState.contentBuffer === 'string' &&
-               typeof parsingState.partialLineBuffer === 'string';
+            typeof parsingState.currentMode === 'string' &&
+            parsingState.openedFiles instanceof Set &&
+            parsingState.closedFiles instanceof Set &&
+            typeof parsingState.contentBuffer === 'string' &&
+            typeof parsingState.partialLineBuffer === 'string';
     }
-    
+
     private initializeSCOFState(): SCOFParsingState {
         return {
             currentMode: 'idle',
@@ -65,7 +64,7 @@ export class SCOFFormat extends CodeGenerationFormat {
             extractedInstallCommands: []
         };
     }
-    
+
     private processAccumulatedContent(
         state: CodeGenerationStreamingState,
         scofState: SCOFParsingState,
@@ -75,23 +74,23 @@ export class SCOFFormat extends CodeGenerationFormat {
     ): void {
         // Combine any partial line from previous chunk with new content
         const fullContent = scofState.partialLineBuffer + state.accumulator;
-        
+
         // Split into lines, keeping track of whether the last line is complete
         const lines = fullContent.split('\n');
         const lastLineComplete = state.accumulator.endsWith('\n');
-        
+
         // Process complete lines
         const linesToProcess = lastLineComplete ? lines : lines.slice(0, -1);
-        
+
         for (let i = 0; i < linesToProcess.length; i++) {
             const line = linesToProcess[i];
             this.processLine(line, scofState, onFileOpen, onFileChunk, onFileClose, state);
         }
-        
+
         // Handle the last incomplete line
         if (!lastLineComplete && lines.length > 0) {
             const lastLine = lines[lines.length - 1];
-            
+
             // Check if the partial line might be an EOF marker
             if (scofState.insideEofBlock && scofState.eofMarker && lastLine.trim() === scofState.eofMarker) {
                 // This is a complete EOF marker, process it
@@ -106,10 +105,10 @@ export class SCOFFormat extends CodeGenerationFormat {
             scofState.partialLineBuffer = '';
             state.accumulator = '';
         }
-        
+
         scofState.lastChunkEndedWithNewline = lastLineComplete;
     }
-    
+
     private processLine(
         line: string,
         scofState: SCOFParsingState,
@@ -119,7 +118,7 @@ export class SCOFFormat extends CodeGenerationFormat {
         state: CodeGenerationStreamingState
     ): void {
         const trimmedLine = line.trim();
-        
+
         // Check for EOF marker (end of content block)
         if (scofState.insideEofBlock && scofState.eofMarker) {
             // ENHANCED: Robust EOF detection with LLM error resilience
@@ -128,7 +127,7 @@ export class SCOFFormat extends CodeGenerationFormat {
                 return;
             }
         }
-        
+
         // Content line within EOF block
         if (scofState.insideEofBlock) {
             // ENHANCED: Handle nested EOF-like patterns in content
@@ -137,32 +136,32 @@ export class SCOFFormat extends CodeGenerationFormat {
                 if (this.looksLikeCommand(line) && !this.isValidNestedCommand(line, scofState)) {
                     console.warn(`SCOF: Detected command-like content inside EOF block: "${line.trim()}". Treating as content.`);
                 }
-                
+
                 // Add line to content buffer with smart formatting
                 this.addContentLine(line, scofState, onFileChunk);
             }
             return;
         }
-        
+
         // Accumulate content between files for command extraction
         if (trimmedLine === '' || trimmedLine.startsWith('#')) {
             // Add content (including empty lines and comments) to between-files buffer
             scofState.betweenFilesBuffer += line + '\n';
             return;
         }
-        
+
         // Process any accumulated content between files before handling new command
         if (scofState.betweenFilesBuffer.trim()) {
             this.processAccumulatedBetweenFilesContent(scofState);
         }
-        
+
         // Also accumulate non-empty, non-comment lines that aren't commands
         // This ensures we capture all potential command content between SCOF blocks
         const isCommand = this.tryParseCommand(trimmedLine) !== null;
         if (!isCommand) {
             scofState.betweenFilesBuffer += line + '\n';
         }
-        
+
         // Try to parse command from current line first
         const command = this.tryParseCommand(trimmedLine);
         if (command) {
@@ -171,11 +170,11 @@ export class SCOFFormat extends CodeGenerationFormat {
             scofState.parsingMultiLineCommand = false;
             return;
         }
-        
+
         // Handle potential multi-line commands
         if (scofState.parsingMultiLineCommand) {
             scofState.commandBuffer += ' ' + trimmedLine;
-            
+
             // Try to parse complete command
             const multiLineCommand = this.tryParseCommand(scofState.commandBuffer);
             if (multiLineCommand) {
@@ -186,7 +185,7 @@ export class SCOFFormat extends CodeGenerationFormat {
         } else if (trimmedLine.includes('cat')) {
             scofState.commandBuffer = trimmedLine;
             scofState.parsingMultiLineCommand = true;
-            
+
             // Try immediate parsing in case it's a complete command
             const immediateCommand = this.tryParseCommand(scofState.commandBuffer);
             if (immediateCommand) {
@@ -196,49 +195,49 @@ export class SCOFFormat extends CodeGenerationFormat {
             }
         }
     }
-    
+
     private tryParseCommand(commandStr: string): { type: 'file_creation' | 'diff_patch', filePath: string, eofMarker: string } | null {
         // ENHANCED: Normalize command with specific LLM error resilience
         const normalizedCommand = this.normalizeCommand(commandStr);
-        
+
         // ENHANCED: Try file creation with comprehensive LLM error patterns
         const fileCreationResult = this.tryParseFileCreation(normalizedCommand);
         if (fileCreationResult) return fileCreationResult;
-        
+
         // ENHANCED: Try diff patch with comprehensive LLM error patterns
         const diffPatchResult = this.tryParseDiffPatch(normalizedCommand);
         if (diffPatchResult) return diffPatchResult;
-        
+
         return null;
     }
-    
+
     /**
      * ENHANCED: Normalize command string to handle specific LLM mistakes
      */
     private normalizeCommand(commandStr: string): string {
         let normalized = commandStr;
-        
+
         // Fix case sensitivity (common LLM mistake)
         normalized = normalized.replace(/\bCAT\b/gi, 'cat');
         normalized = normalized.replace(/\bCat\b/g, 'cat');
-        
+
         // Normalize excessive whitespace (LLMs often add extra spaces)
         normalized = normalized.replace(/\s+/g, ' ').trim();
-        
+
         // Fix missing spaces around operators (cat>file instead of cat > file)
         normalized = normalized.replace(/cat>/gi, 'cat >');
         normalized = normalized.replace(/>\s*([^<\s])/g, '> $1');
         normalized = normalized.replace(/<<\s*([^|\s])/g, '<< $1');
         normalized = normalized.replace(/\|\s*patch/gi, ' | patch');
-        
+
         // Fix heredoc spacing variations
         normalized = normalized.replace(/<<\s*'([^']+)'\s*/g, " << '$1' ");
         normalized = normalized.replace(/<<\s*"([^"]+)"\s*/g, ' << "$1" ');
         normalized = normalized.replace(/<<\s*([^\s|'"]+)\s*/g, " << '$1' ");
-        
+
         return normalized;
     }
-    
+
     /**
      * ENHANCED: Parse file creation commands with LLM error resilience
      */
@@ -250,7 +249,7 @@ export class SCOFFormat extends CodeGenerationFormat {
             /cat\s*>\s*"([^"]+)"\s*<<\s*"([^"]+)"/i,     // cat > "file.js" << "EOF"
             /cat\s*>\s*'([^']+)'\s*<<\s*"([^"]+)"/i,     // cat > 'file.js' << "EOF"
         ];
-        
+
         for (const pattern of quotedPatterns) {
             const match = command.match(pattern);
             if (match) {
@@ -261,7 +260,7 @@ export class SCOFFormat extends CodeGenerationFormat {
                 };
             }
         }
-        
+
         // Pattern 2: ENHANCED - Handle mismatched quotes (common LLM mistake)
         const mismatchedQuotePatterns = [
             /cat\s*>\s*"([^"']+)'\s*<<\s*'([^']+)'/i,     // cat > "file.js' << 'EOF'
@@ -271,7 +270,7 @@ export class SCOFFormat extends CodeGenerationFormat {
             /cat\s*>\s*([^\s<"']+)\s*<<\s*"([^"]+)'/i,    // cat > file.js << "EOF'
             /cat\s*>\s*([^\s<"']+)\s*<<\s*'([^']+)"/i,    // cat > file.js << 'EOF"
         ];
-        
+
         for (const pattern of mismatchedQuotePatterns) {
             const match = command.match(pattern);
             if (match) {
@@ -285,14 +284,14 @@ export class SCOFFormat extends CodeGenerationFormat {
                 };
             }
         }
-        
+
         // Pattern 3: Unquoted filenames (no spaces, simpler cases)
         const unquotedPatterns = [
             /cat\s*>\s*([^\s<"']+)\s*<<\s*'([^']+)'/i,    // cat > file.js << 'EOF'
             /cat\s*>\s*([^\s<"']+)\s*<<\s*"([^"]+)"/i,    // cat > file.js << "EOF"
             /cat\s*>\s*([^\s|"']+)\s*<<\s*([^\s|]+)/i,    // cat > file.js << EOF
         ];
-        
+
         for (const pattern of unquotedPatterns) {
             const match = command.match(pattern);
             if (match) {
@@ -303,13 +302,13 @@ export class SCOFFormat extends CodeGenerationFormat {
                 };
             }
         }
-        
+
         // Pattern 4: Handle LLM mistakes with spaces in unquoted filenames
         const spacedFilenameMatch = command.match(/cat\s*>\s*([^<]+?)\s*<<\s*([^\s|]+)/i);
         if (spacedFilenameMatch) {
             const rawFilename = spacedFilenameMatch[1].trim();
             const eofMarker = spacedFilenameMatch[2].replace(/['"]/g, '');
-            
+
             // If filename has spaces but no quotes, this is likely an LLM mistake
             // Try to recover by assuming the entire string before << is the filename
             if (rawFilename.includes(' ') && !rawFilename.match(/^["'].*["']$/)) {
@@ -321,10 +320,10 @@ export class SCOFFormat extends CodeGenerationFormat {
                 };
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * ENHANCED: Parse diff patch commands with LLM error resilience
      */
@@ -336,7 +335,7 @@ export class SCOFFormat extends CodeGenerationFormat {
             /cat\s*<<\s*"([^"]+)"\s*\|\s*patch\s+"([^"]+)"/i,  // cat << "EOF" | patch "file.js"
             /cat\s*<<\s*"([^"]+)"\s*\|\s*patch\s+'([^']+)'/i,  // cat << "EOF" | patch 'file.js'
         ];
-        
+
         for (const pattern of quotedPatchPatterns) {
             const match = command.match(pattern);
             if (match) {
@@ -347,25 +346,25 @@ export class SCOFFormat extends CodeGenerationFormat {
                 };
             }
         }
-        
+
         // Pattern 2: Unquoted filenames
         const unquotedPatchPatterns = [
             /cat\s*<<\s*'([^']+)'\s*\|\s*patch\s+([^\s"']+)/i,  // cat << 'EOF' | patch file.js
             /cat\s*<<\s*"([^"]+)"\s*\|\s*patch\s+([^\s"']+)/i,  // cat << "EOF" | patch file.js
             /cat\s*<<\s*([^\s|'"]+)\s*\|\s*patch\s+([^\s"']+)/i,  // cat << EOF | patch file.js (UNQUOTED)
         ];
-        
+
         for (const pattern of unquotedPatchPatterns) {
             const match = command.match(pattern);
             if (match) {
                 const eofMarker = match[1];
                 const filePath = match[2];
-                
+
                 // Check if this is an unquoted malformed pattern
                 if (!eofMarker.match(/^['"]/) && !filePath.match(/^['"]/)) {
                     console.warn(`SCOF: Detected potentially malformed patch command. Auto-correcting: EOF="${eofMarker}", file="${filePath}"`);
                 }
-                
+
                 return {
                     type: 'diff_patch',
                     filePath: filePath,
@@ -373,13 +372,13 @@ export class SCOFFormat extends CodeGenerationFormat {
                 };
             }
         }
-        
+
         // Pattern 3: ENHANCED - Handle malformed patch commands (common LLM mistake)
         const malformedPatchMatch = command.match(/cat\s*<<\s*([^|]+?)\s*\|\s*patch\s+(.+)/i);
         if (malformedPatchMatch) {
             const eofMarker = malformedPatchMatch[1].replace(/['"]/g, '').trim();
             const filePath = malformedPatchMatch[2].replace(/['"]/g, '').trim();
-            
+
             // Enhanced detection: check if this looks like a legitimate patch command
             if (eofMarker && filePath && !eofMarker.includes(' ') && filePath.includes('.')) {
                 console.warn(`SCOF: Detected potentially malformed patch command. Auto-correcting: EOF="${eofMarker}", file="${filePath}"`);
@@ -398,13 +397,13 @@ export class SCOFFormat extends CodeGenerationFormat {
                 };
             }
         }
-        
+
         // Pattern 4: ENHANCED - Handle extremely malformed patch commands (spacing issues)
         const spacingIssueMatch = command.match(/cat\s*<<\s*([^\s|'"]+)\s*\|\s*patch\s+([^\s'"]+)/i);
         if (spacingIssueMatch) {
             const eofMarker = spacingIssueMatch[1];
             const filePath = spacingIssueMatch[2];
-            
+
             console.warn(`SCOF: Auto-correcting patch command spacing: EOF="${eofMarker}", file="${filePath}"`);
             return {
                 type: 'diff_patch',
@@ -412,22 +411,22 @@ export class SCOFFormat extends CodeGenerationFormat {
                 eofMarker: eofMarker
             };
         }
-        
+
         return null;
     }
-    
+
     private handleCommand(
         command: { type: 'file_creation' | 'diff_patch', filePath: string, eofMarker: string },
         scofState: SCOFParsingState,
         onFileOpen: (filePath: string) => void
     ): void {
         const { type, filePath, eofMarker } = command;
-        
+
         // Ensure we don't have overlapping file operations
         if (scofState.currentFile) {
             console.warn(`Warning: Starting new file ${filePath} while ${scofState.currentFile} is still open`);
         }
-        
+
         // Set up new file operation
         scofState.currentMode = type;
         scofState.currentFile = filePath;
@@ -435,7 +434,7 @@ export class SCOFFormat extends CodeGenerationFormat {
         scofState.eofMarker = eofMarker;
         scofState.insideEofBlock = true;
         scofState.contentBuffer = '';
-        
+
         // Call onFileOpen only once per file
         if (!scofState.openedFiles.has(filePath)) {
             scofState.openedFiles.add(filePath);
@@ -450,7 +449,7 @@ export class SCOFFormat extends CodeGenerationFormat {
             scofState.closedFiles.delete(filePath);
         }
     }
-    
+
     private finalizeCurrentFile(
         scofState: SCOFParsingState,
         onFileClose: (filePath: string) => void,
@@ -459,10 +458,10 @@ export class SCOFFormat extends CodeGenerationFormat {
         if (!scofState.currentFile || !scofState.currentFileFormat) {
             return;
         }
-        
+
         const filePath = scofState.currentFile;
         let finalContent = scofState.contentBuffer;
-        
+
         // Apply diff if this is a diff patch operation
         if (scofState.currentMode === 'diff_patch') {
             const existingFile = state.completedFiles.get(filePath);
@@ -476,7 +475,7 @@ export class SCOFFormat extends CodeGenerationFormat {
                 }
             }
         }
-        
+
         // Store completed file with format information
         const fileObject: FileGenerationOutputType = {
             filePath: filePath,
@@ -484,9 +483,9 @@ export class SCOFFormat extends CodeGenerationFormat {
             format: scofState.currentFileFormat,
             filePurpose: '',
         };
-        
+
         state.completedFiles.set(filePath, fileObject);
-        
+
         // Call onFileClose only once per file, with comprehensive tracking
         if (!scofState.closedFiles.has(filePath)) {
             scofState.closedFiles.add(filePath);
@@ -500,7 +499,7 @@ export class SCOFFormat extends CodeGenerationFormat {
         if (scofState.openedFiles.has(filePath)) {
             scofState.openedFiles.delete(filePath);
         }
-        
+
         // Reset current file state
         scofState.currentMode = 'idle';
         scofState.currentFile = null;
@@ -509,22 +508,22 @@ export class SCOFFormat extends CodeGenerationFormat {
         scofState.insideEofBlock = false;
         scofState.contentBuffer = '';
     }
-    
+
     private isEOFMarker(line: string, eofMarker: string): boolean {
         // ENHANCED: Robust EOF detection with LLM error resilience
         return line.trim() === eofMarker;
     }
-    
+
     private looksLikeCommand(line: string): boolean {
         // ENHANCED: Handle nested EOF-like patterns in content
         return line.includes('cat') || line.includes('patch');
     }
-    
+
     private isValidNestedCommand(line: string, scofState: SCOFParsingState): boolean {
         // ENHANCED: Handle nested EOF-like patterns in content
         return scofState.eofMarker ? line.includes(scofState.eofMarker) : false;
     }
-    
+
     private addContentLine(line: string, scofState: SCOFParsingState, onFileChunk: (filePath: string, chunk: string, format: 'full_content' | 'unified_diff') => void): void {
         // ENHANCED: Handle nested EOF-like patterns in content
         if (scofState.currentFile && scofState.currentFileFormat) {
@@ -533,19 +532,19 @@ export class SCOFFormat extends CodeGenerationFormat {
             if (scofState.contentBuffer.length > 0 && !scofState.contentBuffer.endsWith('\n') && line.trim() !== '') {
                 scofState.contentBuffer += '\n';
             }
-            
+
             // Add the line content (don't add empty lines that are just whitespace)
             if (line.trim() !== '' || scofState.contentBuffer.length === 0) {
                 scofState.contentBuffer += line;
             }
-            
+
             // Send chunk callback with format information (only for non-empty content)
             if (line.trim() !== '') {
                 onFileChunk(scofState.currentFile, line + '\n', scofState.currentFileFormat);
             }
         }
     }
-    
+
     serialize(files: FileGenerationOutputType[]): string {
         let output = '';
 
@@ -553,7 +552,7 @@ export class SCOFFormat extends CodeGenerationFormat {
             // Replace all newlines with \n# 
             return `# File Purpose: ${purpose.replace(/\n/g, '\n# ')}\n\n`;
         }
-        
+
         for (const file of files) {
             if (file.format === 'unified_diff') {
                 output += `# Patch for file: ${file.filePath}\n`;
@@ -576,30 +575,30 @@ export class SCOFFormat extends CodeGenerationFormat {
                 output += 'EOF\n\n';
             }
         }
-        
+
         return output;
     }
-    
+
     deserialize(serialized: string): FileGenerationOutputType[] {
         const state: CodeGenerationStreamingState = {
             accumulator: '',
             completedFiles: new Map(),
             parsingState: this.initializeSCOFState()
         };
-        
+
         // Process the entire serialized content
         this.parseStreamingChunks(
             serialized,
             state,
-            () => {}, // onFileOpen
-            () => {}, // onFileChunk  
-            () => {}  // onFileClose
+            () => { }, // onFileOpen
+            () => { }, // onFileChunk  
+            () => { }  // onFileClose
         );
-        
+
         // Convert completed files map to array
         return Array.from(state.completedFiles.values());
     }
-    
+
     /**
      * Process accumulated content between SCOF file blocks to extract install commands
      */
@@ -607,21 +606,21 @@ export class SCOFFormat extends CodeGenerationFormat {
         if (!scofState.betweenFilesBuffer.trim()) {
             return;
         }
-        
+
         // Extract only install commands from the accumulated content
         const installCommands = extractCommands(scofState.betweenFilesBuffer, true);
-        
+
         // Add unique install commands to the extracted commands array
         for (const command of installCommands) {
             if (!scofState.extractedInstallCommands.includes(command)) {
                 scofState.extractedInstallCommands.push(command);
             }
         }
-        
+
         // Clear the buffer after processing
         scofState.betweenFilesBuffer = '';
     }
-    
+
     formatInstructions(): string {
         return `
 <OUTPUT FORMAT>

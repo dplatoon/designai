@@ -1288,13 +1288,14 @@ export const STRATEGIES = {
 }
 
 export interface GeneralSystemPromptBuilderParams {
-    query: string,
-    templateDetails: TemplateDetails,
-    dependencies: Record<string, string>,
-    blueprint?: Blueprint,
-    language?: string,
-    frameworks?: string[],
-    templateMetaInfo?: TemplateSelection,
+    query: string;
+    templateDetails: TemplateDetails;
+    dependencies: Record<string, string>;
+    blueprint?: Blueprint;
+    language?: string;
+    frameworks?: string[];
+    templateMetaInfo?: TemplateSelection;
+    extraVariables?: Record<string, string>;
 }
 
 export function generalSystemPromptBuilder(
@@ -1323,6 +1324,11 @@ export function generalSystemPromptBuilder(
     }
     if (params.templateMetaInfo) {
         variables.usecaseSpecificInstructions = getUsecaseSpecificInstructions(params.templateMetaInfo);
+    }
+
+    // Include any extra variables provided
+    if (params.extraVariables) {
+        Object.assign(variables, params.extraVariables);
     }
 
     const formattedPrompt = PROMPT_UTILS.replaceTemplateVariables(prompt, variables);

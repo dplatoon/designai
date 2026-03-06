@@ -26,6 +26,7 @@ import { createLogger } from '../../logger';
 import { validateEmail, validatePassword } from '../../utils/validationUtils';
 import { extractRequestMetadata, mapUserResponse } from '../../utils/authUtils';
 import { BaseService } from './BaseService';
+import { sendVerificationEmail, resendVerificationEmail, verifyEmailOTP, sendPasswordResetEmail } from '../../services/email/EmailService';
 import { EmailService } from '../../services/email/EmailService';
 import { validateRedirectUrl } from '../../utils/redirectValidation';
 
@@ -116,18 +117,23 @@ export class AuthService extends BaseService {
             const userId = generateId();
             const now = new Date();
 
+            // Store user as unverified initially
             // Store user as unverified
             await this.database.insert(schema.users).values({
                 id: userId,
                 email: data.email.toLowerCase(),
                 passwordHash,
                 displayName: data.name || data.email.split('@')[0],
+                emailVerified: false, // Set as unverified by default
                 emailVerified: false, // Do not set as verified immediately
                 provider: 'email',
                 providerId: userId,
                 createdAt: now,
                 updatedAt: now
             });
+
+            // Send verification email after user is created
+            await sendVerificationEmail(this.env as any, userId, data.email.toLowerCase());
 
             // Get the created user
             const newUser = await this.database
@@ -146,6 +152,9 @@ export class AuthService extends BaseService {
 
             // Log successful registration
             await this.logAuthAttempt(data.email, 'register', true, request);
+            logger.info('User registered and logged in directly', { userId, email: data.email });
+
+            // Create session and tokens immediately (log user in after registration)
             logger.info('User registered, verification required', { userId, email: data.email });
 
             // Generate and store verification OTP
@@ -545,6 +554,43 @@ export class AuthService extends BaseService {
      * Validate and sanitize redirect URL to prevent open redirect attacks
      * Delegates to the centralized redirect validation utility
      */
+    private validateRedirectUrl(redirectUrl: string, request: Request): string | null {
+        try {
+            const requestUrl = new URL(request.url);
+
+            // Handle relative URLs by constructing absolute URL with same origin
+            const redirectUrlObj = redirectUrl.startsWith('/')
+                ? new URL(redirectUrl, requestUrl.origin)
+                : new URL(redirectUrl);
+
+            // Only allow same-origin redirects for security
+            if (redirectUrlObj.origin !== requestUrl.origin) {
+                logger.warn('OAuth redirect URL rejected: different origin', {
+                    redirectUrl: redirectUrl,
+                    requestOrigin: requestUrl.origin,
+                    redirectOrigin: redirectUrlObj.origin
+                });
+                return null;
+            }
+
+            // Prevent redirecting to authentication endpoints to avoid loops
+            const authPaths = ['/api/auth/', '/logout'];
+            if (authPaths.some(path => redirectUrlObj.pathname.startsWith(path))) {
+                logger.warn('OAuth redirect URL rejected: auth endpoint', {
+                    redirectUrl: redirectUrl,
+                    pathname: redirectUrlObj.pathname
+                });
+                return null;
+            }
+
+            return redirectUrl;
+        } catch (error) {
+            logger.warn('Invalid OAuth redirect URL format', { redirectUrl, error });
+            return null;
+        }
+    }
+
+    /**
     private validateOAuthRedirectUrl(redirectUrl: string, request: Request): string | null {
         return validateRedirectUrl(redirectUrl, { request });
     }
@@ -581,6 +627,7 @@ export class AuthService extends BaseService {
      */
     async verifyEmailWithOtp(email: string, otp: string, request: Request): Promise<AuthResult> {
         try {
+            // Find the user by email first to get their ID
             // Find valid OTP
             const storedOtp = await this.database
                 .select()
@@ -634,13 +681,18 @@ export class AuthService extends BaseService {
                 );
             }
 
-            // Update user as verified
-            await this.database
-                .update(schema.users)
-                .set({ emailVerified: true, updatedAt: new Date() })
-                .where(eq(schema.users.id, user.id));
+            // Use the new verification logic from EmailService
+            const verifyResult = await verifyEmailOTP(this.env as any, user.id, otp);
 
-            // Create session for verified user
+            if (!verifyResult.success) {
+                throw new SecurityError(
+                    SecurityErrorType.INVALID_INPUT,
+                    verifyResult.error || 'Verification failed',
+                    400
+                );
+            }
+
+            // Create session for the now-verified user
             const { accessToken, session } = await this.sessionService.createSession(
                 user.id,
                 request
@@ -729,8 +781,9 @@ export class AuthService extends BaseService {
     /**
      * Validate token and return user (for middleware)
      */
-    async validateTokenAndGetUser(token: string, env: Env): Promise<AuthUserSession | null> {
+    async validateTokenAndGetUser(token: string, _env: Env): Promise<AuthUserSession | null> {
         try {
+            const jwtUtils = JWTUtils.getInstance(this.env as any);
             const jwtUtils = JWTUtils.getInstance(env as { JWT_SECRET: string });
             const payload = await jwtUtils.verifyToken(token);
 
@@ -788,16 +841,16 @@ export class AuthService extends BaseService {
                 );
             }
 
-            // Invalidate existing OTPs
-            await this.database
-                .update(schema.verificationOtps)
-                .set({ used: true, usedAt: new Date() })
-                .where(
-                    and(
-                        eq(schema.verificationOtps.email, email.toLowerCase()),
-                        eq(schema.verificationOtps.used, false)
-                    )
+            // Use the new resend logic from EmailService
+            const resendResult = await resendVerificationEmail(this.env as any, user.id, email.toLowerCase());
+
+            if (!resendResult.success) {
+                throw new SecurityError(
+                    SecurityErrorType.INVALID_INPUT,
+                    resendResult.error || 'Failed to resend verification code',
+                    429
                 );
+            }
 
             // Generate new OTP
             await this.generateAndStoreVerificationOtp(email.toLowerCase());
@@ -812,6 +865,128 @@ export class AuthService extends BaseService {
             throw new SecurityError(
                 SecurityErrorType.INVALID_INPUT,
                 'Failed to resend verification code',
+                500
+            );
+        }
+    }
+
+    /**
+     * Send password reset email
+     */
+    async forgotPassword(email: string): Promise<void> {
+        try {
+            const user = await this.database
+                .select()
+                .from(schema.users)
+                .where(eq(schema.users.email, email.toLowerCase()))
+                .get();
+
+            if (!user || user.provider !== 'email') {
+                // For security, don't reveal if user exists or uses OAuth
+                // Just log it internally
+                logger.info('Password reset requested for non-existent or OAuth user', { email });
+                return;
+            }
+
+            await sendPasswordResetEmail(this.env as any, user.id, email.toLowerCase());
+
+            logger.info('Password reset email sent', { email, userId: user.id });
+        } catch (error) {
+            logger.error('Forgot password error', error);
+            // Don't throw for security reasons, just log and return
+        }
+    }
+
+    /**
+     * Reset password using OTP
+     */
+    async resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
+        try {
+            const user = await this.database
+                .select()
+                .from(schema.users)
+                .where(eq(schema.users.email, email.toLowerCase()))
+                .get();
+
+            if (!user || user.provider !== 'email') {
+                throw new SecurityError(
+                    SecurityErrorType.INVALID_INPUT,
+                    'User not found',
+                    404
+                );
+            }
+
+            // Verify OTP from password_resets table
+            const record = await this.env.DB.prepare(
+                `SELECT otp, expires_at FROM password_resets WHERE user_id = ?`
+            )
+                .bind(user.id)
+                .first<{ otp: string; expires_at: string }>();
+
+            if (!record) {
+                throw new SecurityError(
+                    SecurityErrorType.INVALID_INPUT,
+                    'Password reset request timed out or was not requested. Please try again.',
+                    400
+                );
+            }
+
+            if (new Date(record.expires_at) < new Date()) {
+                await this.env.DB.prepare(`DELETE FROM password_resets WHERE user_id = ?`)
+                    .bind(user.id)
+                    .run();
+                throw new SecurityError(
+                    SecurityErrorType.INVALID_INPUT,
+                    'Password reset code expired. Please request a new one.',
+                    400
+                );
+            }
+
+            if (record.otp !== otp.trim()) {
+                throw new SecurityError(
+                    SecurityErrorType.INVALID_INPUT,
+                    'Invalid password reset code.',
+                    400
+                );
+            }
+
+            // Validation of new password
+            const validation = validatePassword(newPassword);
+            if (!validation.valid) {
+                throw new SecurityError(
+                    SecurityErrorType.INVALID_INPUT,
+                    validation.errors?.[0] || 'Invalid password',
+                    400
+                );
+            }
+
+            // Hash and update password
+            const passwordHash = await this.passwordService.hash(newPassword);
+            await this.database
+                .update(schema.users)
+                .set({
+                    passwordHash,
+                    updatedAt: new Date(),
+                    passwordChangedAt: new Date(),
+                    failedLoginAttempts: 0,
+                    lockedUntil: null
+                })
+                .where(eq(schema.users.id, user.id));
+
+            // Clean up reset record
+            await this.env.DB.prepare(`DELETE FROM password_resets WHERE user_id = ?`)
+                .bind(user.id)
+                .run();
+
+            logger.info('Password reset successfully', { email, userId: user.id });
+        } catch (error) {
+            if (error instanceof SecurityError) {
+                throw error;
+            }
+            logger.error('Reset password error', error);
+            throw new SecurityError(
+                SecurityErrorType.INVALID_INPUT,
+                'Failed to reset password. Please try again later.',
                 500
             );
         }

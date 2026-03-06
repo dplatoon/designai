@@ -16,7 +16,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  
+
   // Auth provider configuration
   authProviders: {
     google: boolean;
@@ -25,18 +25,18 @@ interface AuthContextType {
   } | null;
   hasOAuth: boolean;
   requiresEmailAuth: boolean;
-  
+
   // OAuth login method with redirect support
   login: (provider: 'google' | 'github', redirectUrl?: string) => void;
-  
+
   // Email/password login method
   loginWithEmail: (credentials: { email: string; password: string }) => Promise<void>;
   register: (data: { email: string; password: string; name?: string }) => Promise<void>;
-  
+
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   clearError: () => void;
-  
+
   // Redirect URL management
   setIntendedUrl: (url: string) => void;
   getIntendedUrl: () => string | null;
@@ -58,10 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [hasOAuth, setHasOAuth] = useState<boolean>(false);
   const [requiresEmailAuth, setRequiresEmailAuth] = useState<boolean>(true);
   const navigate = useNavigate();
-  
+
   // Sync user context with Sentry for error tracking
   useSentryUser(user);
-  
+
   // Ref to store the refresh timer
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = useCallback(async () => {
     try {
       const response = await apiClient.getProfile(true);
-      
+
       if (response.success && response.data?.user) {
         setUser({ ...response.data.user, isAnonymous: false } as AuthUser);
         setToken(null); // Profile endpoint doesn't return token, cookies are used
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sessionId: response.data.sessionId || response.data.user.id,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours expiry
         });
-        
+
         // Setup token refresh
         setupTokenRefresh();
       } else {
@@ -142,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Setup automatic session validation (cookie-based)
@@ -192,11 +193,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Store intended redirect URL if provided, otherwise use current location
     const intendedUrl = redirectUrl || window.location.pathname + window.location.search;
     setIntendedUrl(intendedUrl);
-    
+
     // Build OAuth URL with redirect parameter
     const oauthUrl = new URL(`/api/auth/oauth/${provider}`, window.location.origin);
     oauthUrl.searchParams.set('redirect_url', intendedUrl);
-    
+
     // Redirect to OAuth provider
     window.location.href = oauthUrl.toString();
   }, [setIntendedUrl]);
@@ -219,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           expiresAt: response.data.expiresAt,
         });
         setupTokenRefresh();
-        
+
         // Navigate to intended URL or default to home
         const intendedUrl = getIntendedUrl();
         clearIntendedUrl();
@@ -257,7 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           expiresAt: response.data.expiresAt,
         });
         setupTokenRefresh();
-        
+
         // Navigate to intended URL or default to home
         const intendedUrl = getIntendedUrl();
         clearIntendedUrl();

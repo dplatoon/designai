@@ -476,11 +476,12 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
         // Remove [*.] from model name
         modelName = modelName.replace(/\[.*?\]/, '');
 
-        const client = new OpenAI({ apiKey, baseURL: baseURL, defaultHeaders });
         const schemaObj =
             schema && schemaName && !format
                 ? { response_format: zodResponseFormat(schema, schemaName) }
                 : {};
+
+        const extraBody = (modelName.includes('claude') || modelName.includes('3.5-sonnet')) ? {
         const extraBody = modelName.includes('claude') ? {
             extra_body: {
                 thinking: {
@@ -563,35 +564,92 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
 
         const toolsOpts = tools ? { tools, tool_choice: 'auto' as const } : {};
         let response: OpenAI.ChatCompletion | OpenAI.ChatCompletionChunk | Stream<OpenAI.ChatCompletionChunk>;
-        try {
-            // Call OpenAI API with proper structured output format
-            response = await client.chat.completions.create({
-                ...schemaObj,
-                ...extraBody,
-                ...toolsOpts,
-                model: modelName,
-                messages: messagesToPass as OpenAI.ChatCompletionMessageParam[],
-                max_completion_tokens: maxTokens || 150000,
-                stream: stream ? true : false,
-                reasoning_effort,
-                temperature,
-            }, {
-                headers: {
-                    "cf-aig-metadata": JSON.stringify({
-                        chatId: metadata.agentId,
-                        userId: metadata.userId,
-                        schemaName,
-                        actionKey,
-                    })
+
+        // Execute inference with retry logic and fallback
+        const maxRetries = 3;
+        let lastError: any = null;
+        let currentBaseURL = baseURL;
+        let currentApiKey = apiKey;
+        let isDirectFallback = false;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const currentClient = new OpenAI({
+                    apiKey: currentApiKey,
+                    baseURL: currentBaseURL,
+                    defaultHeaders
+                });
+
+                // Call OpenAI API with proper structured output format
+                response = await currentClient.chat.completions.create({
+                    ...schemaObj,
+                    ...extraBody,
+                    ...toolsOpts,
+                    model: modelName,
+                    messages: messagesToPass as OpenAI.ChatCompletionMessageParam[],
+                    max_completion_tokens: maxTokens || 150000,
+                    stream: stream ? true : false,
+                    reasoning_effort,
+                    temperature,
+                }, {
+                    headers: {
+                        "cf-aig-metadata": JSON.stringify({
+                            chatId: metadata.agentId,
+                            userId: metadata.userId,
+                            schemaName,
+                            actionKey,
+                        })
+                    }
+                });
+
+                console.log(`Inference response received on attempt ${attempt}`);
+                break; // Success!
+
+            } catch (error: any) {
+                lastError = error;
+                console.error(`Attempt ${attempt} failed:`, error);
+
+                // Handle rate limits
+                if (error.status === 429) {
+                    console.warn('Rate limit exceeded (429), backing off...');
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                        continue;
+                    }
                 }
-            });
-            console.log(`Inference response received`);
-        } catch (error) {
-            console.error(`Failed to get inference response from OpenAI: ${error}`);
-            if ((error instanceof Error && error.message.includes('429')) || (typeof error === 'string' && error.includes('429'))) {
-                throw new RateLimitExceededError('Rate limit exceeded in LLM calls, Please try again later', RateLimitType.LLM_CALLS);
+
+                // If AI Gateway is failing (500, 404, or non-JSON response), attempt direct fallback for Gemini/Google or OpenAI models
+                if (!isDirectFallback) {
+                    if ((modelName.includes('gemini') || modelName.includes('google')) && env.GOOGLE_AI_STUDIO_API_KEY) {
+                        console.log('Attempting direct Gemini API fallback...');
+                        currentBaseURL = 'https://generativelanguage.googleapis.com/v1beta/openai/';
+                        currentApiKey = env.GOOGLE_AI_STUDIO_API_KEY;
+                        isDirectFallback = true;
+                        continue;
+                    } else if (modelName.includes('gpt-') && env.OPENAI_API_KEY) {
+                        console.log('Attempting direct OpenAI API fallback...');
+                        currentBaseURL = 'https://api.openai.com/v1/';
+                        currentApiKey = env.OPENAI_API_KEY;
+                        isDirectFallback = true;
+                        continue;
+                    }
+                }
+
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+                    continue;
+                }
+
+                // If we reach here, we've exhausted retries
+                if (error.status === 429) {
+                    throw new RateLimitExceededError('Rate limit exceeded in LLM calls. Please try again later.', RateLimitType.LLM_CALLS);
+                }
+                throw error;
             }
-            throw error;
+        }
+
+        if (!response!) {
+            throw lastError || new Error('Failed to get response from AI model after multiple attempts');
         }
         let toolCalls: ChatCompletionMessageFunctionToolCall[] = [];
 

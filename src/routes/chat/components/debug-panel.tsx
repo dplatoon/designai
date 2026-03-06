@@ -95,7 +95,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
   const [viewMode, setViewMode] = useState<'list' | 'timeline' | 'analytics'>('list');
   const [bookmarkedMessages, setBookmarkedMessages] = useState<Set<string>>(new Set());
   // notifications removed per design request
-  
+
   // Helper functions defined first to avoid hoisting issues
   const calculateOperationMetrics = (wsMessages: DebugMessage[]) => {
     try {
@@ -105,40 +105,40 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
         cfDeployment: [] as number[],
         runnerDeployment: [] as number[]
       };
-      
+
       // Track phase lifecycle: phase_generating → phase_generated → phase_implementing → phase_implemented
       const phaseStarts = wsMessages.filter(m => m.messageType === 'phase_generating');
       const phaseCompletes = wsMessages.filter(m => m.messageType === 'phase_implemented');
-      
+
       phaseStarts.forEach(start => {
         const complete = phaseCompletes.find(c => c.timestamp > start.timestamp);
         if (complete) {
           operations.phaseGeneration.push(complete.timestamp - start.timestamp);
         }
       });
-      
+
       // Enhanced file generation tracking with content analysis
       const fileStarts = wsMessages.filter(m => m.messageType === 'file_generating');
       const fileCompletes = wsMessages.filter(m => m.messageType === 'file_generated');
-      
+
       fileStarts.forEach(start => {
         const complete = fileCompletes.find(c => c.timestamp > start.timestamp);
         if (complete) {
           const duration = complete.timestamp - start.timestamp;
-          
+
           // Extract file content info from message if available
           let lines = 0;
           let chars = 0;
-          
+
           try {
             // Try to extract content metrics from the complete message
             const content = complete.message || '';
-            
+
             // Look for content indicators in the message
             const linesMatch = content.match(/(\d+)\s*lines?/i);
             const charsMatch = content.match(/(\d+)\s*characters?/i);
             const sizeMatch = content.match(/(\d+)\s*bytes?/i);
-            
+
             if (linesMatch) {
               lines = parseInt(linesMatch[1]);
             } else {
@@ -148,7 +148,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                 lines = fileContentMatch[0].split('\n').length - 2; // Subtract code fence lines
               }
             }
-            
+
             if (charsMatch) {
               chars = parseInt(charsMatch[1]);
             } else if (sizeMatch) {
@@ -162,7 +162,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                 chars = content.length;
               }
             }
-            
+
             // Fallback estimates if no metrics found
             if (lines === 0 && chars > 0) {
               lines = Math.max(1, Math.floor(chars / 50)); // Estimate ~50 chars per line
@@ -170,54 +170,54 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
             if (chars === 0 && lines > 0) {
               chars = lines * 50; // Estimate 50 chars per line
             }
-            
+
           } catch (parseError) {
             // Use default estimates for unknown content
             lines = 50; // Default estimate
             chars = 2500; // Default estimate
           }
-          
+
           operations.fileGeneration.push({ duration, lines, chars });
         }
       });
-      
+
       // Track CF deployment: cloudflare_deployment_started → cloudflare_deployment_completed
       const cfStarts = wsMessages.filter(m => m.messageType === 'cloudflare_deployment_started');
       const cfCompletes = wsMessages.filter(m => m.messageType === 'cloudflare_deployment_completed');
-      
+
       cfStarts.forEach(start => {
         const complete = cfCompletes.find(c => c.timestamp > start.timestamp);
         if (complete) {
           operations.cfDeployment.push(complete.timestamp - start.timestamp);
         }
       });
-      
+
       // Track runner deployment: phase_implemented → deployment_completed
       const runnerStarts = wsMessages.filter(m => m.messageType === 'phase_implemented');
       const runnerCompletes = wsMessages.filter(m => m.messageType === 'deployment_completed');
-      
+
       runnerStarts.forEach(start => {
         const complete = runnerCompletes.find(c => c.timestamp > start.timestamp);
         if (complete) {
           operations.runnerDeployment.push(complete.timestamp - start.timestamp);
         }
       });
-      
+
       // Calculate statistics for duration-only operations
       const getStats = (durations: number[]) => {
         if (durations.length === 0) return { avg: 0, median: 0, p99: 0, count: 0 };
-        
+
         const sorted = [...durations].sort((a, b) => a - b);
         const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
-        const median = sorted.length % 2 === 0 ? 
-          (sorted[sorted.length/2-1] + sorted[sorted.length/2]) / 2 :
-          sorted[Math.floor(sorted.length/2)];
+        const median = sorted.length % 2 === 0 ?
+          (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 :
+          sorted[Math.floor(sorted.length / 2)];
         const p99Index = Math.ceil(sorted.length * 0.99) - 1;
         const p99 = sorted[Math.max(0, p99Index)];
-        
+
         return { avg, median, p99, count: durations.length };
       };
-      
+
       // Calculate enhanced file generation statistics
       const getFileStats = (fileOps: { duration: number; lines: number; chars: number }[]) => {
         if (fileOps.length === 0) {
@@ -229,25 +229,25 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
             totalChars: 0
           };
         }
-        
+
         const durations = fileOps.map(op => op.duration);
         const linesPerSec = fileOps.map(op => op.duration > 0 ? (op.lines / (op.duration / 1000)) : 0);
         const charsPerSec = fileOps.map(op => op.duration > 0 ? (op.chars / (op.duration / 1000)) : 0);
-        
+
         const totalLines = fileOps.reduce((sum, op) => sum + op.lines, 0);
         const totalChars = fileOps.reduce((sum, op) => sum + op.chars, 0);
-        
+
         const calcStats = (values: number[]) => {
           const sorted = [...values].sort((a, b) => a - b);
           const avg = values.reduce((a, b) => a + b, 0) / values.length;
-          const median = sorted.length % 2 === 0 ? 
-            (sorted[sorted.length/2-1] + sorted[sorted.length/2]) / 2 :
-            sorted[Math.floor(sorted.length/2)];
+          const median = sorted.length % 2 === 0 ?
+            (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 :
+            sorted[Math.floor(sorted.length / 2)];
           const p99Index = Math.ceil(sorted.length * 0.99) - 1;
           const p99 = sorted[Math.max(0, p99Index)];
           return { avg, median, p99 };
         };
-        
+
         return {
           duration: { ...getStats(durations), count: fileOps.length },
           linesPerSecond: calcStats(linesPerSec),
@@ -256,7 +256,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
           totalChars
         };
       };
-      
+
       return {
         phaseGeneration: getStats(operations.phaseGeneration),
         fileGeneration: getFileStats(operations.fileGeneration),
@@ -279,11 +279,11 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       };
     }
   };
-  
+
   const processTimelineData = (messages: DebugMessage[]) => {
     try {
       if (!messages || messages.length === 0) return { events: [], lanes: [] };
-      
+
       const events = messages.map((msg, index) => ({
         id: msg.id || `msg-${index}`,
         timestamp: msg.timestamp || Date.now(),
@@ -294,7 +294,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
         duration: index > 0 ? (msg.timestamp || 0) - (messages[index - 1]?.timestamp || 0) : 0,
         isBookmarked: bookmarkedMessages.has(msg.id || '')
       }));
-      
+
       // Group events into lanes by category for better visualization
       const lanes = [
         { id: 'generation', label: 'Generation', color: 'bg-blue-100 border-blue-300' },
@@ -303,44 +303,44 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
         { id: 'deployment', label: 'Deployment', color: 'bg-orange-100 border-orange-300' },
         { id: 'system', label: 'System', color: 'bg-red-100 border-red-300' }
       ];
-      
+
       return { events, lanes };
     } catch (error) {
       console.error('Error processing timeline data:', error);
       return { events: [], lanes: [] };
     }
   };
-  
+
   // Advanced performance analytics - only compute when panel is open
   const analyticsData = useMemo(() => {
     try {
       if (!isOpen) return null; // Performance optimization: don't compute when closed
-      
+
       const now = Date.now();
       const last24h = messages.filter(m => now - m.timestamp < 24 * 60 * 60 * 1000);
       const errors = messages.filter(m => m.type === 'error');
       const warnings = messages.filter(m => m.type === 'warning');
       const wsMessages = messages.filter(m => m.type === 'websocket');
-      
+
       // Calculate statistical metrics for message intervals
       const intervals = [];
       for (let i = 1; i < messages.length; i++) {
-        intervals.push(messages[i].timestamp - messages[i-1].timestamp);
+        intervals.push(messages[i].timestamp - messages[i - 1].timestamp);
       }
-      
+
       const sortedIntervals = [...intervals].sort((a, b) => a - b);
-      const median = sortedIntervals.length > 0 ? 
-        sortedIntervals.length % 2 === 0 ? 
-          (sortedIntervals[sortedIntervals.length/2-1] + sortedIntervals[sortedIntervals.length/2]) / 2 :
-          sortedIntervals[Math.floor(sortedIntervals.length/2)] : 0;
-      
+      const median = sortedIntervals.length > 0 ?
+        sortedIntervals.length % 2 === 0 ?
+          (sortedIntervals[sortedIntervals.length / 2 - 1] + sortedIntervals[sortedIntervals.length / 2]) / 2 :
+          sortedIntervals[Math.floor(sortedIntervals.length / 2)] : 0;
+
       const p99Index = Math.ceil(sortedIntervals.length * 0.99) - 1;
       const p99 = sortedIntervals.length > 0 ? sortedIntervals[Math.max(0, p99Index)] : 0;
       const avgInterval = intervals.length > 0 ? intervals.reduce((a, b) => a + b, 0) / intervals.length : 0;
-      
+
       // Track operation-specific durations
       const operationMetrics = calculateOperationMetrics(wsMessages);
-      
+
       return {
         totalMessages: messages.length,
         last24h: last24h.length,
@@ -348,9 +348,9 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
         warningRate: messages.length > 0 ? (warnings.length / messages.length * 100).toFixed(1) : '0',
         wsMessages: wsMessages.length,
         intervals: {
-          avg: avgInterval > 1000 ? `${(avgInterval/1000).toFixed(1)}s` : `${avgInterval.toFixed(0)}ms`,
-          median: median > 1000 ? `${(median/1000).toFixed(1)}s` : `${median.toFixed(0)}ms`,
-          p99: p99 > 1000 ? `${(p99/1000).toFixed(1)}s` : `${p99.toFixed(0)}ms`
+          avg: avgInterval > 1000 ? `${(avgInterval / 1000).toFixed(1)}s` : `${avgInterval.toFixed(0)}ms`,
+          median: median > 1000 ? `${(median / 1000).toFixed(1)}s` : `${median.toFixed(0)}ms`,
+          p99: p99 > 1000 ? `${(p99 / 1000).toFixed(1)}s` : `${p99.toFixed(0)}ms`
         },
         operations: operationMetrics
       };
@@ -358,22 +358,23 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       console.error('Error calculating analytics data:', error);
       return null;
     }
-  }, [messages, isOpen, bookmarkedMessages]);
-  
+  }, [messages, isOpen]);
+
   // Timeline data processing - optimized for performance
   const timelineData = useMemo(() => {
     try {
       if (!isOpen || viewMode !== 'timeline') return null; // Only compute when timeline is active
-      
+
       return processTimelineData(messages);
     } catch (error) {
       console.error('Error processing timeline data:', error);
       return null;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, isOpen, viewMode, bookmarkedMessages]);
-  
+
   // notifications logic removed
-  
+
   // Message bookmarking functionality
   const toggleBookmark = (messageId: string) => {
     const newBookmarks = new Set(bookmarkedMessages);
@@ -384,57 +385,57 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
     }
     setBookmarkedMessages(newBookmarks);
   };
-  
+
   // WebSocket message categorization
   const categorizeWebSocketMessage = (messageType?: string): 'generation' | 'phase' | 'file' | 'deployment' | 'system' | undefined => {
     if (!messageType) return undefined;
-    
+
     // Generation messages
     if (['generation_started', 'generation_complete', 'generation_errors'].includes(messageType)) {
       return 'generation';
     }
-    
+
     // Phase messages  
     if (['phase_generating', 'phase_generated', 'phase_implementing', 'phase_implemented'].includes(messageType)) {
       return 'phase';
     }
-    
+
     // File operation messages
     if (['file_generating', 'file_generated', 'file_regenerated', 'file_chunk_generated', 'file_enhanced', 'file_regenerating'].includes(messageType)) {
       return 'file';
     }
-    
+
     // Deployment messages
     if (['cloudflare_deployment_started', 'cloudflare_deployment_completed', 'cloudflare_deployment_error', 'deployment_completed'].includes(messageType)) {
       return 'deployment';
     }
-    
+
     // System/Runtime messages
     if (['runtime_error_found', 'command_executing', 'code_review', 'error'].includes(messageType)) {
       return 'system';
     }
-    
+
     return 'system'; // Default fallback
   };
-  
+
   const panelRef = useRef<HTMLDivElement>(null);
 
   const filteredMessages = messages.filter(msg => {
     // Basic type filtering
     if (filter !== 'all' && msg.type !== filter) return false;
-    
+
     // WebSocket category filtering
     if (filter === 'websocket' && wsFilter !== 'all') {
       const category = msg.wsCategory || categorizeWebSocketMessage(msg.messageType);
       if (category !== wsFilter) return false;
     }
-    
+
     // Search filtering
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return msg.message.toLowerCase().includes(query) ||
-             msg.source?.toLowerCase().includes(query) ||
-             msg.messageType?.toLowerCase().includes(query);
+        msg.source?.toLowerCase().includes(query) ||
+        msg.messageType?.toLowerCase().includes(query);
     }
     return true;
   });
@@ -461,11 +462,11 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
 
   const generateDebugDump = async (): Promise<DebugDump> => {
     const screenshot = await captureScreenshot();
-    
+
     return {
       timestamp: Date.now(),
       chatSessionId: chatSessionId || 'unknown',
-      messages: messages.map(msg => ({...msg})), // Deep copy
+      messages: messages.map(msg => ({ ...msg })), // Deep copy
       appState: {
         url: window.location.href,
         userAgent: navigator.userAgent,
@@ -486,7 +487,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `debug-dump-${new Date().toISOString().slice(0,19)}.json`;
+      a.download = `debug-dump-${new Date().toISOString().slice(0, 19)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -502,7 +503,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       const dump = await generateDebugDump();
       const subject = `Debug Dump - ${chatSessionId || 'Unknown Session'}`;
       const body = `Debug dump generated at ${new Date().toISOString()}\n\nDump data attached as JSON.`;
-      
+
       // Create mailto link with dump as attachment workaround
       const mailtoLink = `mailto:ashishsingh@cloudflare.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n' + JSON.stringify(dump, null, 2))}`;
       window.open(mailtoLink);
@@ -519,11 +520,10 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       {/* Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-50 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-105 ${
-          (errorCount > 0 || warningCount > 0) && !isOpen
+        className={`fixed bottom-6 right-6 z-50 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-105 ${(errorCount > 0 || warningCount > 0) && !isOpen
             ? 'bg-red-500 text-white animate-pulse'
             : 'bg-zinc-800 text-white hover:bg-zinc-700'
-        }`}
+          }`}
         title={`Debug Console (${errorCount + warningCount} issues)`}
       >
         <Bug className="w-4 h-4" />
@@ -537,9 +537,8 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       {/* Debug Panel */}
       <div
         ref={panelRef}
-        className={`fixed right-0 top-0 h-full bg-bg-3 dark:bg-bg-4 shadow-2xl border-l border-border-primary z-[60] transform transition-all duration-300 ease-in-out flex flex-col ${
-          isMaximized ? 'w-[80vw]' : 'w-[600px]'
-        } ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 h-full bg-bg-3 dark:bg-bg-4 shadow-2xl border-l border-border-primary z-[60] transform transition-all duration-300 ease-in-out flex flex-col ${isMaximized ? 'w-[80vw]' : 'w-[600px]'
+          } ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border-primary bg-gradient-to-r from-muted to-accent">
@@ -567,11 +566,10 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                 <button
                   key={key}
                   onClick={() => setViewMode(key)}
-                  className={`px-2 py-1 text-xs rounded transition-all flex items-center gap-1 ${
-                    viewMode === key
+                  className={`px-2 py-1 text-xs rounded transition-all flex items-center gap-1 ${viewMode === key
                       ? 'bg-bg-3 text-text-primary shadow-sm'
                       : 'text-text-tertiary hover:text-text-primary'
-                  }`}
+                    }`}
                   title={`${label} view`}
                 >
                   <Icon className="w-3 h-3" />
@@ -579,7 +577,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                 </button>
               ))}
             </div>
-            
+
             {/* Notifications removed per design */}
             <div className="flex items-center gap-2 basis-full justify-end pt-2">
               <Button
@@ -650,17 +648,16 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                     setWsFilter('all'); // Reset WebSocket filter when not filtering by WebSocket
                   }
                 }}
-                className={`px-3 py-1 text-xs rounded-full transition-all ${
-                  filter === key
+                className={`px-3 py-1 text-xs rounded-full transition-all ${filter === key
                     ? 'bg-blue-500 text-white'
                     : 'bg-bg-3 text-text-primary hover:bg-bg-3 border border-border-primary'
-                }`}
+                  }`}
               >
                 {label} ({count})
               </button>
             ))}
           </div>
-          
+
           {/* WebSocket Category Filters - Show only when WebSocket filter is active */}
           {filter === 'websocket' && (
             <div className="mt-3 pt-3 border-t border-border-primary">
@@ -677,11 +674,10 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                   <button
                     key={key}
                     onClick={() => setWsFilter(key)}
-                    className={`px-2 py-1 text-xs rounded transition-all ${
-                      wsFilter === key
+                    className={`px-2 py-1 text-xs rounded transition-all ${wsFilter === key
                         ? 'bg-purple-600 text-white dark:bg-purple-700'
                         : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-900/40 dark:border-purple-800'
-                    }`}
+                      }`}
                   >
                     {label} ({count})
                   </button>
@@ -716,7 +712,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                       <div className="text-sm text-green-800">Avg Interval</div>
                     </div>
                   </div>
-                  
+
                   {/* Statistical Analysis */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-bg-3/50 p-4 rounded-lg">
@@ -743,11 +739,11 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                       <div className="text-sm text-amber-700">System Health</div>
                     </div>
                   </div>
-                  
+
                   {/* Enhanced Operation-Specific Metrics */}
                   <div className="space-y-6">
                     <h4 className="font-medium text-text-primary text-lg">🚀 Operation Performance Metrics</h4>
-                    
+
                     {/* File Generation - Special Enhanced Display */}
                     {analyticsData.operations.fileGeneration.duration.count > 0 && (
                       <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6">
@@ -755,7 +751,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                           <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                           <h5 className="font-bold text-purple-900 text-lg">📝 File Generation Performance</h5>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                           <div className="bg-bg-4/70 dark:bg-bg-4/50 rounded-lg p-4 text-center">
                             <div className="text-2xl font-bold text-purple-600">
@@ -782,7 +778,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                             <div className="text-sm text-teal-800">Files Generated</div>
                           </div>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="bg-bg-4/70 dark:bg-bg-4/50 rounded-lg p-4">
                             <h6 className="font-medium text-text-primary mb-2">⚡ Generation Speed</h6>
@@ -795,9 +791,9 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                           <div className="bg-bg-4/70 dark:bg-bg-4/50 rounded-lg p-4">
                             <h6 className="font-medium text-text-primary mb-2">⏱️ Duration Stats</h6>
                             <div className="space-y-1 text-sm">
-                              <div>Avg: <span className="font-mono font-medium">{analyticsData.operations.fileGeneration.duration.avg > 1000 ? `${(analyticsData.operations.fileGeneration.duration.avg/1000).toFixed(1)}s` : `${analyticsData.operations.fileGeneration.duration.avg.toFixed(0)}ms`}</span></div>
-                              <div>Median: <span className="font-mono font-medium">{analyticsData.operations.fileGeneration.duration.median > 1000 ? `${(analyticsData.operations.fileGeneration.duration.median/1000).toFixed(1)}s` : `${analyticsData.operations.fileGeneration.duration.median.toFixed(0)}ms`}</span></div>
-                              <div>P99: <span className="font-mono font-medium">{analyticsData.operations.fileGeneration.duration.p99 > 1000 ? `${(analyticsData.operations.fileGeneration.duration.p99/1000).toFixed(1)}s` : `${analyticsData.operations.fileGeneration.duration.p99.toFixed(0)}ms`}</span></div>
+                              <div>Avg: <span className="font-mono font-medium">{analyticsData.operations.fileGeneration.duration.avg > 1000 ? `${(analyticsData.operations.fileGeneration.duration.avg / 1000).toFixed(1)}s` : `${analyticsData.operations.fileGeneration.duration.avg.toFixed(0)}ms`}</span></div>
+                              <div>Median: <span className="font-mono font-medium">{analyticsData.operations.fileGeneration.duration.median > 1000 ? `${(analyticsData.operations.fileGeneration.duration.median / 1000).toFixed(1)}s` : `${analyticsData.operations.fileGeneration.duration.median.toFixed(0)}ms`}</span></div>
+                              <div>P99: <span className="font-mono font-medium">{analyticsData.operations.fileGeneration.duration.p99 > 1000 ? `${(analyticsData.operations.fileGeneration.duration.p99 / 1000).toFixed(1)}s` : `${analyticsData.operations.fileGeneration.duration.p99.toFixed(0)}ms`}</span></div>
                             </div>
                           </div>
                           <div className="bg-bg-4/70 dark:bg-bg-4/50 rounded-lg p-4">
@@ -811,7 +807,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Other Operations */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {Object.entries(analyticsData.operations)
@@ -823,7 +819,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                             cfDeployment: { icon: '☁️', color: 'orange', label: 'CF Deployment' },
                             runnerDeployment: { icon: '🚀', color: 'blue', label: 'Runner Deployment' }
                           }[operation] || { icon: '⚙️', color: 'gray', label: operation };
-                          
+
                           return (
                             <div key={operation} className={`bg-${operationConfig.color}-50 border border-${operationConfig.color}-200 rounded-lg p-4`}>
                               <div className="flex items-center gap-2 mb-3">
@@ -834,18 +830,18 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                                 <div className="space-y-3">
                                   <div className="text-center">
                                     <div className={`text-2xl font-bold text-${operationConfig.color}-600`}>
-                                      {simpleStats.avg > 1000 ? `${(simpleStats.avg/1000).toFixed(1)}s` : `${simpleStats.avg.toFixed(0)}ms`}
+                                      {simpleStats.avg > 1000 ? `${(simpleStats.avg / 1000).toFixed(1)}s` : `${simpleStats.avg.toFixed(0)}ms`}
                                     </div>
                                     <div className={`text-sm text-${operationConfig.color}-800`}>Average Duration</div>
                                   </div>
                                   <div className="grid grid-cols-2 gap-2 text-xs">
                                     <div>
                                       <div className="text-text-tertiary">Median</div>
-                                      <div className="font-mono font-medium">{simpleStats.median > 1000 ? `${(simpleStats.median/1000).toFixed(1)}s` : `${simpleStats.median.toFixed(0)}ms`}</div>
+                                      <div className="font-mono font-medium">{simpleStats.median > 1000 ? `${(simpleStats.median / 1000).toFixed(1)}s` : `${simpleStats.median.toFixed(0)}ms`}</div>
                                     </div>
                                     <div>
                                       <div className="text-text-tertiary">P99</div>
-                                      <div className="font-mono font-medium">{simpleStats.p99 > 1000 ? `${(simpleStats.p99/1000).toFixed(1)}s` : `${simpleStats.p99.toFixed(0)}ms`}</div>
+                                      <div className="font-mono font-medium">{simpleStats.p99 > 1000 ? `${(simpleStats.p99 / 1000).toFixed(1)}s` : `${simpleStats.p99.toFixed(0)}ms`}</div>
                                     </div>
                                   </div>
                                   <div className="pt-2 border-t border-border-primary text-center">
@@ -867,7 +863,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                   <p className="text-sm">Analytics loading...</p>
                 </div>
               )}
-              
+
               {bookmarkedMessages.size > 0 && (
                 <div className="bg-amber-50 p-4 rounded-lg">
                   <h4 className="font-medium text-amber-800 mb-3 flex items-center gap-2">
@@ -900,12 +896,12 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                       Message Timeline ({timelineData.events.length} events)
                     </h4>
                     <div className="text-sm text-text-tertiary">
-                      Duration: {((timelineData.events[timelineData.events.length - 1]?.timestamp || 0) - (timelineData.events[0]?.timestamp || 0)) > 1000 ? 
-                        `${(((timelineData.events[timelineData.events.length - 1]?.timestamp || 0) - (timelineData.events[0]?.timestamp || 0)) / 1000).toFixed(1)}s` : 
+                      Duration: {((timelineData.events[timelineData.events.length - 1]?.timestamp || 0) - (timelineData.events[0]?.timestamp || 0)) > 1000 ?
+                        `${(((timelineData.events[timelineData.events.length - 1]?.timestamp || 0) - (timelineData.events[0]?.timestamp || 0)) / 1000).toFixed(1)}s` :
                         `${((timelineData.events[timelineData.events.length - 1]?.timestamp || 0) - (timelineData.events[0]?.timestamp || 0)).toFixed(0)}ms`}
                     </div>
                   </div>
-                  
+
                   {/* Lane Legend */}
                   <div className="flex flex-wrap gap-2 mb-4">
                     {timelineData.lanes.map(lane => (
@@ -914,17 +910,17 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                       </div>
                     ))}
                   </div>
-                  
+
                   {/* Timeline Events */}
                   <div className="relative">
                     {/* Vertical timeline line */}
                     <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border"></div>
-                    
+
                     <div className="space-y-4">
                       {timelineData.events.map((event, index) => {
                         const lane = timelineData.lanes.find(l => l.id === event.category) || timelineData.lanes[4]; // Default to system
                         const relativeTime = index > 0 ? event.timestamp - timelineData.events[0].timestamp : 0;
-                        
+
                         return (
                           <div key={event.id} className="relative flex items-start">
                             {/* Timeline marker */}
@@ -939,7 +935,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                                 <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                               )}
                             </div>
-                            
+
                             {/* Event content */}
                             <div className="ml-4 flex-1 min-w-0">
                               <div className="flex items-center justify-between">
@@ -957,18 +953,18 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                                  <span>+{relativeTime > 1000 ? `${(relativeTime/1000).toFixed(1)}s` : `${relativeTime.toFixed(0)}ms`}</span>
+                                  <span>+{relativeTime > 1000 ? `${(relativeTime / 1000).toFixed(1)}s` : `${relativeTime.toFixed(0)}ms`}</span>
                                   <span>{new Date(event.timestamp).toLocaleTimeString()}</span>
                                 </div>
                               </div>
-                              
+
                               <div className="mt-2 text-sm text-text-primary truncate" title={event.message}>
                                 {event.message}
                               </div>
-                              
+
                               {event.duration > 0 && (
                                 <div className="mt-1 text-xs text-text-tertiary">
-                                  Duration: {event.duration > 1000 ? `${(event.duration/1000).toFixed(1)}s` : `${event.duration.toFixed(0)}ms`}
+                                  Duration: {event.duration > 1000 ? `${(event.duration / 1000).toFixed(1)}s` : `${event.duration.toFixed(0)}ms`}
                                 </div>
                               )}
                             </div>
@@ -995,78 +991,76 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                   <p className="text-sm">No messages match your filters</p>
                 </div>
               ) : (
-            filteredMessages
-              .slice()
-              .reverse()
-              .map((message) => {
-                const isExpanded = expandedMessages.has(message.id);
-                return (
-                  <div
-                    key={message.id}
-                    className={`border-l-4 rounded-r-lg p-3 pr-10 transition-all relative ${
-                      message.type === 'error'
-                        ? 'border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-400'
-                        : message.type === 'warning'
-                        ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-400'
-                        : message.type === 'websocket'
-                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 dark:border-purple-400'
-                        : 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                    } ${bookmarkedMessages.has(message.id) ? 'ring-2 ring-amber-300' : ''}`}
-                  >
-                    {/* Bookmark Button */}
-                    <button
-                      onClick={() => toggleBookmark(message.id)}
-                      className={`absolute top-2 right-2 p-1 rounded transition-all ${
-                        bookmarkedMessages.has(message.id)
-                          ? 'text-amber-500 hover:text-amber-600'
-                          : 'text-text-tertiary hover:text-amber-500'
-                      }`}
-                      title={bookmarkedMessages.has(message.id) ? 'Remove bookmark' : 'Add bookmark'}
-                    >
-                      {bookmarkedMessages.has(message.id) ? (
-                        <Bookmark className="w-4 h-4 fill-current" />
-                      ) : (
-                        <BookmarkPlus className="w-4 h-4" />
-                      )}
-                    </button>
-                    <div className="flex items-start justify-between gap-2 mb-2 pr-6">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm capitalize">
-                          {message.type}
-                        </span>
-                        {message.messageType && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-mono dark:bg-purple-900/40 dark:text-purple-200 dark:border dark:border-purple-800">
-                            {message.messageType}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-text-tertiary">
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-
-                    <div className="text-sm text-text-primary mb-2">
-                      {message.message}
-                    </div>
-
-                    {message.details && (
-                      <div>
+                filteredMessages
+                  .slice()
+                  .reverse()
+                  .map((message) => {
+                    const isExpanded = expandedMessages.has(message.id);
+                    return (
+                      <div
+                        key={message.id}
+                        className={`border-l-4 rounded-r-lg p-3 pr-10 transition-all relative ${message.type === 'error'
+                            ? 'border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-400'
+                            : message.type === 'warning'
+                              ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-400'
+                              : message.type === 'websocket'
+                                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 dark:border-purple-400'
+                                : 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                          } ${bookmarkedMessages.has(message.id) ? 'ring-2 ring-amber-300' : ''}`}
+                      >
+                        {/* Bookmark Button */}
                         <button
-                          onClick={() => toggleExpanded(message.id)}
-                          className="text-xs text-blue-600 hover:text-blue-800 underline"
+                          onClick={() => toggleBookmark(message.id)}
+                          className={`absolute top-2 right-2 p-1 rounded transition-all ${bookmarkedMessages.has(message.id)
+                              ? 'text-amber-500 hover:text-amber-600'
+                              : 'text-text-tertiary hover:text-amber-500'
+                            }`}
+                          title={bookmarkedMessages.has(message.id) ? 'Remove bookmark' : 'Add bookmark'}
                         >
-                          {isExpanded ? 'Hide details' : 'Show details'}
+                          {bookmarkedMessages.has(message.id) ? (
+                            <Bookmark className="w-4 h-4 fill-current" />
+                          ) : (
+                            <BookmarkPlus className="w-4 h-4" />
+                          )}
                         </button>
-                        {isExpanded && (
-                          <pre className="mt-2 text-xs bg-bg-3 dark:bg-zinc-900 p-2 rounded overflow-x-auto text-text-tertiary whitespace-pre-wrap max-h-40">
-                            {message.details}
-                          </pre>
+                        <div className="flex items-start justify-between gap-2 mb-2 pr-6">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm capitalize">
+                              {message.type}
+                            </span>
+                            {message.messageType && (
+                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-mono dark:bg-purple-900/40 dark:text-purple-200 dark:border dark:border-purple-800">
+                                {message.messageType}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-text-tertiary">
+                            {new Date(message.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+
+                        <div className="text-sm text-text-primary mb-2">
+                          {message.message}
+                        </div>
+
+                        {message.details && (
+                          <div>
+                            <button
+                              onClick={() => toggleExpanded(message.id)}
+                              className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                              {isExpanded ? 'Hide details' : 'Show details'}
+                            </button>
+                            {isExpanded && (
+                              <pre className="mt-2 text-xs bg-bg-3 dark:bg-zinc-900 p-2 rounded overflow-x-auto text-text-tertiary whitespace-pre-wrap max-h-40">
+                                {message.details}
+                              </pre>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })
+                    );
+                  })
               )}
             </div>
           )}

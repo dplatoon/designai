@@ -23,7 +23,7 @@ export async function fixUndefinedName(
     const modifiedFilesMap = new Map<string, FileObject>();
     const newFiles: FileObject[] = [];
     const fetchedFiles = new Set(context.fetchedFiles);
-    
+
     // Group issues by file to handle multiple undefined names in the same file
     const issuesByFile = new Map<string, CodeIssue[]>();
     for (const issue of issues) {
@@ -36,12 +36,12 @@ export async function fixUndefinedName(
     for (const [filePath, fileIssues] of issuesByFile) {
         try {
             const fileContent = await getFileContent(
-                filePath, 
-                context.files, 
-                context.fileFetcher, 
+                filePath,
+                context.files,
+                context.fileFetcher,
                 fetchedFiles
             );
-            
+
             if (!fileContent) {
                 for (const issue of fileIssues) {
                     unfixableIssues.push({
@@ -160,30 +160,30 @@ function isGlobalVariable(name: string): boolean {
  */
 function analyzeUsageContext(fileContent: string, name: string, line: number): string {
     const lines = fileContent.split('\n');
-    
+
     // Get expanded context: more surrounding lines for better analysis
     const startLine = Math.max(0, line - 5);
     const endLine = Math.min(lines.length, line + 5);
     const contextLines = lines.slice(startLine, endLine).join('\n');
     const errorLine = lines[line - 1] || '';
     // Enhanced pattern detection with priority order and improved accuracy
-    
+
     // 1. Class instantiation - check for 'new' keyword
     // Look for: new Name( or new Name<T>( or new Name ()
     const classPattern = new RegExp(`new\\s+${name}\\s*[<(]`, 'g');
     if (classPattern.test(contextLines)) {
         return 'class';
     }
-    
+
     // 2. React/JSX component - check for JSX usage
     // Look for: <Name or <Name> or <Name/> or <Name prop=
     // Also check if file is .tsx and name starts with capital
-    const jsxPattern = new RegExp(`<${name}(?:\\s|>|\/>)`, 'g');
-    if (jsxPattern.test(contextLines) || 
+    const jsxPattern = new RegExp(`<${name}(?:\\s|>|/>)`, 'g');
+    if (jsxPattern.test(contextLines) ||
         (fileContent.includes('React') && name[0] === name[0].toUpperCase() && jsxPattern.test(contextLines))) {
         return 'react_component';
     }
-    
+
     // 3. Function call - check for invocation with better accuracy
     // Look for: Name( or Name.method( but not new Name(
     // Also check for async/await patterns
@@ -193,7 +193,7 @@ function analyzeUsageContext(fileContent: string, name: string, line: number): s
     if (functionPattern.test(errorLine) || asyncPattern.test(contextLines) || promisePattern.test(contextLines)) {
         return 'function';
     }
-    
+
     // 4. Type usage - check for TypeScript type contexts with better patterns
     // Look for: : Name or extends Name or implements Name or Name<
     // Also check for type assertions and generic constraints
@@ -202,7 +202,7 @@ function analyzeUsageContext(fileContent: string, name: string, line: number): s
     if (typePattern.test(contextLines) || genericPattern.test(contextLines)) {
         return 'type_or_interface';
     }
-    
+
     // 5. Object property/method access with better detection
     // Look for: Name.property or Name.method() or Name?.property
     // Also check for destructuring patterns
@@ -211,7 +211,7 @@ function analyzeUsageContext(fileContent: string, name: string, line: number): s
     if (objectPattern.test(errorLine) || destructurePattern.test(contextLines)) {
         return 'object';
     }
-    
+
     // 6. Array or object indexing
     // Look for: Name[index] or Name['key']
     // Also check for array methods
@@ -220,7 +220,7 @@ function analyzeUsageContext(fileContent: string, name: string, line: number): s
     if (indexPattern.test(errorLine) || arrayMethodPattern.test(contextLines)) {
         return 'array_or_object';
     }
-    
+
     // 7. Assignment target - check if being assigned to
     // Look for: Name = value or let/const/var Name
     const assignmentPattern = new RegExp(`\\b${name}\\s*=(?!=)`, 'g');
@@ -228,7 +228,7 @@ function analyzeUsageContext(fileContent: string, name: string, line: number): s
     if (assignmentPattern.test(errorLine) && !declarationPattern.test(errorLine)) {
         return 'variable';
     }
-    
+
     // 8. Enum or constant usage with improved patterns
     // Look for: Name.CONSTANT or usage in switch cases
     // Also check for string literal types patterns
@@ -237,19 +237,19 @@ function analyzeUsageContext(fileContent: string, name: string, line: number): s
     if (enumPattern.test(contextLines) || switchPattern.test(contextLines)) {
         return 'enum_or_constants';
     }
-    
+
     // 9. Check if used as a value in expressions
     // Look for usage in conditions, returns, etc.
     const valuePattern = new RegExp(`(return|if|while|for|switch|case|throw).*\\b${name}\\b`, 'g');
     if (valuePattern.test(errorLine)) {
         return 'value';
     }
-    
+
     // 10. Hook pattern for React
     if (name.startsWith('use') && name[3] && name[3] === name[3].toUpperCase()) {
         return 'react_hook';
     }
-    
+
     return 'unknown';
 }
 
@@ -279,7 +279,7 @@ const ${name}: React.FC<${name}Props> = ({ children, className, style, ...props 
 };
 
 export default ${name};`;
-        
+
         case 'function':
             // Better function typing with generic return type
             return `
@@ -296,7 +296,7 @@ function ${name}<T = unknown>(...args: unknown[]): T | null {
 }
 
 export { ${name} };`;
-        
+
         case 'class':
             // Better class template with common patterns
             return `
@@ -319,7 +319,7 @@ class ${name} {
 }
 
 export { ${name} };`;
-        
+
         case 'type_or_interface':
             // Better TypeScript interface with common patterns
             return `
@@ -333,7 +333,7 @@ interface ${name} {
 }
 
 export type { ${name} };`;
-        
+
         case 'object':
             // Better object with typed methods
             return `
@@ -360,7 +360,7 @@ const ${name} = {
 } as const;
 
 export { ${name} };`;
-        
+
         case 'array_or_object':
             // Better array/collection type
             return `
@@ -388,7 +388,7 @@ export const ${name}Utils = {
 };
 
 export { ${name} };`;
-        
+
         case 'enum_or_constants':
             // Better enum with TypeScript enum syntax
             return `
@@ -412,7 +412,7 @@ const ${name}Values = {
 
 export { ${name}, ${name}Values };
 export type ${name}Type = keyof typeof ${name}Values;`;
-        
+
         case 'variable':
             // Better typed mutable variable
             return `
@@ -428,7 +428,7 @@ export const set${name[0].toUpperCase()}${name.slice(1)} = (value: unknown): voi
 };
 
 export { ${name} };`;
-        
+
         case 'value':
             // Better constant with proper typing
             return `
@@ -438,7 +438,7 @@ export { ${name} };`;
 const ${name}: unknown = null; // TODO: Set actual value and type
 
 export { ${name} };`;
-        
+
         case 'react_hook':
             // React custom hook template
             return `
@@ -457,7 +457,7 @@ function ${name}<T = unknown>(initialValue?: T): [T | undefined, (value: T) => v
 }
 
 export { ${name} };`;
-        
+
         default:
             // Better generic fallback
             return `
@@ -484,7 +484,7 @@ function addDeclarationToAST(ast: t.File, declaration: string): t.File {
         // Parse the declaration as a statement
         const declarationAst = parseCode(declaration);
         const declarationStatement = declarationAst.program.body[0];
-        
+
         if (declarationStatement) {
             // Find the position after imports to insert the declaration
             let insertIndex = 0;
@@ -496,7 +496,7 @@ function addDeclarationToAST(ast: t.File, declaration: string): t.File {
                     break;
                 }
             }
-            
+
             // Insert the declaration
             ast.program.body.splice(insertIndex, 0, declarationStatement);
         }
@@ -507,7 +507,7 @@ function addDeclarationToAST(ast: t.File, declaration: string): t.File {
         );
         ast.program.body.unshift(commentStatement);
     }
-    
+
     return ast;
 }
 

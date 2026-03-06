@@ -74,7 +74,16 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
 	logger.info(`Sandbox miss for ${hostname}, attempting dispatch to permanent worker.`);
 	if (!isDispatcherAvailable(env)) {
 		logger.warn(`Dispatcher not available, cannot serve: ${hostname}`);
-		return new Response('This application is not currently available.', { status: 404 });
+		return new Response(JSON.stringify({
+			success: false,
+			error: {
+				message: 'This application is not currently available.',
+				type: 'NOT_FOUND'
+			}
+		}), {
+			status: 404,
+			headers: { 'Content-Type': 'application/json' }
+		});
 	}
 
 	// Extract the app name (e.g., "xyz" from "xyz.build.cloudflare.dev").
@@ -101,7 +110,17 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
 	} catch (error: any) {
 		// This block catches errors if the binding doesn't exist or if worker.fetch() fails.
 		logger.warn(`Error dispatching to worker '${appName}': ${error.message}`);
-		return new Response('An error occurred while loading this application.', { status: 500 });
+		return new Response(JSON.stringify({
+			success: false,
+			error: {
+				message: 'An error occurred while loading this application.',
+				type: 'DISPATCH_ERROR',
+				details: error.message
+			}
+		}), {
+			status: 500,
+			headers: { 'Content-Type': 'application/json' }
+		});
 	}
 }
 
@@ -110,6 +129,25 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
  */
 const worker = {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		try {
+			console.log(`Received request: ${request.method} ${request.url}`);
+			// --- Pre-flight Checks ---
+
+			// 1. Critical configuration check: Ensure custom domain is set.
+			const previewDomain = getPreviewDomain(env);
+			if (!previewDomain || previewDomain.trim() === '') {
+				console.error('FATAL: env.CUSTOM_DOMAIN is not configured in wrangler.toml or the Cloudflare dashboard.');
+				return new Response(JSON.stringify({
+					success: false,
+					error: {
+						message: 'Server configuration error: Application domain is not set.',
+						type: 'CONFIG_ERROR'
+					}
+				}), {
+					status: 500,
+					headers: { 'Content-Type': 'application/json' }
+				});
+			}
 		console.log(`Received request: ${request.method} ${request.url}`);
 
 		// 0. Validate critical environment variables
@@ -134,34 +172,85 @@ const worker = {
 			return new Response('Access denied. Please use the assigned domain name.', { status: 403 });
 		}
 
-		// --- Domain-based Routing ---
+			const url = new URL(request.url);
+			const { hostname, pathname } = url;
 
-		// Normalize hostnames for both local development (localhost) and production.
-		const isMainDomainRequest =
-			hostname === env.CUSTOM_DOMAIN || hostname === 'localhost';
-		const isSubdomainRequest =
-			hostname.endsWith(`.${previewDomain}`) ||
-			(hostname.endsWith('.localhost') && hostname !== 'localhost');
-
-		// Route 1: Main Platform Request (e.g., build.cloudflare.dev or localhost)
-		if (isMainDomainRequest) {
-			// Serve static assets for all non-API routes from the ASSETS binding.
-			if (!pathname.startsWith('/api/')) {
-				return env.ASSETS.fetch(request);
+			// 2. Security: Immediately reject any requests made via an IP address.
+			const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+			if (ipRegex.test(hostname)) {
+				return new Response(JSON.stringify({
+					success: false,
+					error: {
+						message: 'Access denied. Please use the assigned domain name.',
+						type: 'ACCESS_DENIED'
+					}
+				}), {
+					status: 403,
+					headers: { 'Content-Type': 'application/json' }
+				});
 			}
-			// Handle all API requests with the main Hono application.
-			logger.info(`Handling API request for: ${url}`);
-			const app = createApp(env);
-			return app.fetch(request, env, ctx);
-		}
 
-		// Route 2: User App Request (e.g., xyz.build.cloudflare.dev or test.localhost)
-		if (isSubdomainRequest) {
-			return handleUserAppRequest(request, env);
-		}
+			// --- Domain-based Routing ---
 
-		return new Response('Not Found', { status: 404 });
-	},
+			// Normalize hostnames for both local development (localhost) and production.
+			const isMainDomainRequest =
+				hostname === env.CUSTOM_DOMAIN ||
+				hostname === 'localhost' ||
+				hostname.endsWith('.workers.dev');
+
+			const isSubdomainRequest =
+				hostname.endsWith(`.${previewDomain}`) ||
+				(hostname.endsWith('.localhost') && hostname !== 'localhost');
+
+			// Route 1: Main Platform Request (e.g., build.cloudflare.dev or localhost)
+			if (isMainDomainRequest) {
+				// Serve static assets for all non-API routes from the ASSETS binding.
+				if (!pathname.startsWith('/api/')) {
+					const response = await env.ASSETS.fetch(request);
+
+					// If asset not found (404), fallback to index.html for SPA routing
+					if (response.status === 404 && !pathname.includes('.')) {
+						const indexRequest = new Request(new URL('/', request.url), request);
+						return env.ASSETS.fetch(indexRequest);
+					}
+
+					return response;
+				}
+				// Handle all API requests with the main Hono application.
+				logger.info(`Handling API request for: ${url}`);
+				const app = createApp(env);
+				return app.fetch(request, env, ctx);
+			}
+
+			// Route 2: User App Request (e.g., xyz.build.cloudflare.dev or test.localhost)
+			if (isSubdomainRequest) {
+				return handleUserAppRequest(request, env);
+			}
+
+			return new Response(JSON.stringify({
+				success: false,
+				error: {
+					message: 'Not Found',
+					type: 'NOT_FOUND'
+				}
+			}), {
+				status: 404,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		} catch (error: any) {
+			console.error('FATAL WORKER ERROR:', error);
+			return new Response(JSON.stringify({
+				success: false,
+				error: {
+					message: error.message || 'Fatal worker error',
+					stack: error.stack
+				}
+			}), {
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+	}
 } satisfies ExportedHandler<Env>;
 
 // export default worker;

@@ -12,12 +12,14 @@ import {
     registerSchema,
     oauthProviderSchema
 } from './authSchemas';
+import { SecurityError } from 'shared/types/errors';
 import { SecurityError, SecurityErrorType } from 'shared/types/errors';
 import {
     formatAuthResponse,
     mapUserResponse,
     setSecureAuthCookies,
     clearAuthCookies,
+    extractSessionId
     extractSessionId,
     extractRequestMetadata
 } from '../../../utils/authUtils';
@@ -31,6 +33,41 @@ import { revalidateStoredRedirectUrl } from '../../../utils/redirectValidation';
 /**
  * Authentication Controller
  */
+
+// Helper: determine whether a given email is allowed by ALLOWED_EMAIL env.
+// Supports:
+//  - undefined or empty => allow all
+//  - "*" or "any" => allow all
+//  - exact email matches (alice@example.com)
+//  - comma-separated entries like "alice@example.com,@gmail.com,example.com,*.example.com"
+//  - domain entries with or without leading '@'
+//  - wildcard entries starting with "*." (treated the same as the domain)
+export function isEmailAllowed(email: string, allowedEnv?: string | null): boolean {
+    if (!allowedEnv) return true;                    // no whitelist => allow all
+    const allowed = allowedEnv.trim();
+    if (!allowed) return true;                       // empty => allow all
+    if (allowed === '*' || allowed.toLowerCase() === 'any') return true; // explicit wildcard
+
+    // allow comma-separated values
+    const entries = allowed.split(',').map(e => e.trim()).filter(Boolean);
+    if (entries.length === 0) return true;
+
+    const lowerEmail = email.toLowerCase();
+    for (const entry of entries) {
+        const e = entry.toLowerCase();
+        // exact email match (contains @)
+        if (e.includes('@') && lowerEmail === e) return true;
+
+        // domain match: allow "example.com" or "@example.com" or "*.example.com"
+        let domain = e;
+        if (domain.startsWith('@')) domain = domain.substring(1);
+        if (domain.startsWith('*.')) domain = domain.substring(2);
+
+        if (lowerEmail.endsWith(`@${domain}`)) return true;
+    }
+    return false;
+}
+
 export class AuthController extends BaseController {
     static logger = createLogger('AuthController');
     /**
@@ -47,9 +84,11 @@ export class AuthController extends BaseController {
      */
     static async register(request: Request, env: Env, _ctx: ExecutionContext, _routeContext: RouteContext): Promise<Response> {
         try {
+            // Check if OAuth providers are configured - if yes, block email/password registration
+            if (AuthController.hasOAuthProviders(env) && env.ENABLE_EMAIL_REGISTRATION !== 'true') {
             if (AuthController.hasOAuthProviders(env)) {
                 return AuthController.createErrorResponse(
-                    'Email/password registration is not available when OAuth providers are configured. Please use OAuth login instead.',
+                    'Email/password registration is not available when OAuth providers are configured. To enable email registration set ENABLE_EMAIL_REGISTRATION=true or remove OAuth provider credentials.',
                     403
                 );
             }
@@ -60,6 +99,17 @@ export class AuthController extends BaseController {
             }
 
             const validatedData = registerSchema.parse(bodyResult.data);
+
+            // Use helper to check whitelist rules
+            if (!isEmailAllowed(validatedData.email, env.ALLOWED_EMAIL)) {
+                return AuthController.createErrorResponse(
+                    'Email Whitelisting is enabled. Please use the allowed email to register.',
+                    403
+                );
+            }
+
+            const authService = new AuthService(env);
+            const result = await authService.register(validatedData, request);
 
             //             if (env.ALLOWED_EMAIL && validatedData.email !== env.ALLOWED_EMAIL) {
             // return AuthController.createErrorResponse(
@@ -100,9 +150,11 @@ export class AuthController extends BaseController {
      */
     static async login(request: Request, env: Env, _ctx: ExecutionContext, _routeContext: RouteContext): Promise<Response> {
         try {
+            // Check if OAuth providers are configured - if yes, block email/password login
+            if (AuthController.hasOAuthProviders(env) && env.ENABLE_EMAIL_REGISTRATION !== 'true') {
             if (AuthController.hasOAuthProviders(env)) {
                 return AuthController.createErrorResponse(
-                    'Email/password login is not available when OAuth providers are configured. Please use OAuth login instead.',
+                    'Email/password login is not available when OAuth providers are configured. To enable email login set ENABLE_EMAIL_REGISTRATION=true or remove OAuth provider credentials.',
                     403
                 );
             }
@@ -114,6 +166,13 @@ export class AuthController extends BaseController {
 
             const validatedData = loginSchema.parse(bodyResult.data);
 
+            // Use helper to check whitelist rules
+            if (!isEmailAllowed(validatedData.email, env.ALLOWED_EMAIL)) {
+                return AuthController.createErrorResponse(
+                    'Email Whitelisting is enabled. Please use the allowed email to login.',
+                    403
+                );
+            }
             //             if (env.ALLOWED_EMAIL && validatedData.email !== env.ALLOWED_EMAIL) {
             // return AuthController.createErrorResponse(
             // 'Email Whitelisting is enabled. Please use the allowed email to login.',
@@ -332,6 +391,8 @@ export class AuthController extends BaseController {
 
             const baseUrl = new URL(request.url).origin;
 
+            // Use stored redirect URL or default to home page
+            const redirectLocation = result.redirectUrl || `${baseUrl}/`;
             // Re-validate the stored URL at point-of-use (defense-in-depth)
             const safeRedirect = revalidateStoredRedirectUrl(result.redirectUrl, request);
             const redirectLocation = safeRedirect ? `${baseUrl}${safeRedirect}` : `${baseUrl}/`;
@@ -607,6 +668,63 @@ export class AuthController extends BaseController {
             }
 
             return AuthController.handleError(error, 'resend verification OTP');
+        }
+    }
+
+    /**
+     * Request password reset
+     * POST /api/auth/forgot-password
+     */
+    static async forgotPassword(request: Request, env: Env, _ctx: ExecutionContext, _routeContext: RouteContext): Promise<Response> {
+        try {
+            const bodyResult = await AuthController.parseJsonBody<{ email: string }>(request);
+            if (!bodyResult.success) {
+                return bodyResult.response!;
+            }
+
+            const { email } = bodyResult.data!;
+            if (!email) {
+                return AuthController.createErrorResponse('Email is required', 400);
+            }
+
+            const authService = new AuthService(env);
+            await authService.forgotPassword(email);
+
+            return AuthController.createSuccessResponse({
+                message: 'If an account exists with this email, a reset code has been sent.'
+            });
+        } catch (error) {
+            return AuthController.handleError(error, 'forgot password');
+        }
+    }
+
+    /**
+     * Reset password
+     * POST /api/auth/reset-password
+     */
+    static async resetPassword(request: Request, env: Env, _ctx: ExecutionContext, _routeContext: RouteContext): Promise<Response> {
+        try {
+            const bodyResult = await AuthController.parseJsonBody<{ email: string; otp: string; newPassword: string }>(request);
+            if (!bodyResult.success) {
+                return bodyResult.response!;
+            }
+
+            const { email, otp, newPassword } = bodyResult.data!;
+            if (!email || !otp || !newPassword) {
+                return AuthController.createErrorResponse('Email, code, and new password are required', 400);
+            }
+
+            const authService = new AuthService(env);
+            await authService.resetPassword(email, otp, newPassword);
+
+            return AuthController.createSuccessResponse({
+                message: 'Password reset successfully. You can now log in with your new password.'
+            });
+        } catch (error) {
+            if (error instanceof SecurityError) {
+                return AuthController.createErrorResponse(error.message, error.statusCode);
+            }
+            return AuthController.handleError(error, 'reset password');
         }
     }
 
