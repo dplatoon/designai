@@ -481,7 +481,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                 ? { response_format: zodResponseFormat(schema, schemaName) }
                 : {};
 
-        const extraBody = (modelName.includes('claude') || modelName.includes('3.5-sonnet')) ? {
+
         const extraBody = modelName.includes('claude') ? {
             extra_body: {
                 thinking: {
