@@ -1,43 +1,22 @@
 {
 	"compilerOptions": {
 		"target": "ESNext",
-		"lib": [
-			"ESNext"
-		],
+		"lib": ["ESNext"],
 		"module": "ESNext",
 		"moduleResolution": "bundler",
-		"customConditions": [
-			"workerd",
-			"worker",
-			"browser"
-		],
+		"customConditions": ["workerd", "worker", "browser"],
 		"types": [
 			"@cloudflare/workers-types",
-			"vite/client",
-			"jest"
-		],
-		"paths": {
-			"shared/*": [
-				"./shared/*"
-			],
-			"worker/*": [
-				"./worker/*"
-			]
-		},
-		"composite": true,
-		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo",
-		"types": [
-			"@cloudflare/workers-types/2023-07-01",
 			"./worker-configuration.d.ts",
 			"vite/client",
 			"jest"
 		],
-		"lib": [
-			"ES2023"
-		]
-	},
-	"include": [
-		"./worker-configuration.d.ts",
+		"paths": {
+			"shared/*": ["./shared/*"],
+			"worker/*": ["./worker/*"]
+		},
+		"composite": true,
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo",
 		"skipLibCheck": true,
 		"strict": true,
 		"allowImportingTsExtensions": true,
