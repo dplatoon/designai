@@ -12,14 +12,12 @@ import {
     registerSchema,
     oauthProviderSchema
 } from './authSchemas';
-import { SecurityError } from 'shared/types/errors';
 import { SecurityError, SecurityErrorType } from 'shared/types/errors';
 import {
     formatAuthResponse,
     mapUserResponse,
     setSecureAuthCookies,
     clearAuthCookies,
-    extractSessionId
     extractSessionId,
     extractRequestMetadata
 } from '../../../utils/authUtils';
@@ -86,12 +84,6 @@ export class AuthController extends BaseController {
         try {
             // Check if OAuth providers are configured - if yes, block email/password registration
             if (AuthController.hasOAuthProviders(env) && env.ENABLE_EMAIL_REGISTRATION !== 'true') {
-            if (AuthController.hasOAuthProviders(env)) {
-                return AuthController.createErrorResponse(
-                    'Email/password registration is not available when OAuth providers are configured. To enable email registration set ENABLE_EMAIL_REGISTRATION=true or remove OAuth provider credentials.',
-                    403
-                );
-            }
 
             const bodyResult = await AuthController.parseJsonBody(request);
             if (!bodyResult.success) {
