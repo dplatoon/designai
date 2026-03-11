@@ -205,7 +205,7 @@ export async function generateBlueprint({ env, inferenceContext, query, language
                 `CLIENT REQUEST: "${query}"`,
                 images.map(img => `data:${img.mimeType};base64,${img.base64Data}`),
                 'high'
-              )
+            )
             : createUserMessage(`CLIENT REQUEST: "${query}"`);
 
         const messages = [
@@ -215,7 +215,7 @@ export async function generateBlueprint({ env, inferenceContext, query, language
 
         // Log messages to console for debugging
         // logger.info('Blueprint messages:', JSON.stringify(messages, null, 2));
-        
+
         // let reasoningEffort: "high" | "medium" | "low" | undefined = "medium" as const;
         // if (templateMetaInfo?.complexity === 'simple' || templateMetaInfo?.complexity === 'moderate') {
         //     console.log(`Using medium reasoning for simple/moderate queries`);
@@ -223,7 +223,7 @@ export async function generateBlueprint({ env, inferenceContext, query, language
         //     reasoningEffort = undefined;
         // }
 
-        const { object: results } = await executeInference({
+        const response = await executeInference({
             env,
             messages,
             agentActionName: "blueprint",
@@ -231,6 +231,12 @@ export async function generateBlueprint({ env, inferenceContext, query, language
             context: inferenceContext,
             stream: stream,
         });
+
+        if (!response || !('object' in response)) {
+            throw new Error("Failed to generate blueprint from AI model after multiple retries. This may be due to an invalid API key, quota limits, or a network issue with the AI provider.");
+        }
+
+        const { object: results } = response;
 
         if (results) {
             // Filter and remove any pdf files

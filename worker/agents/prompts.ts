@@ -6,6 +6,57 @@ import { IssueReport } from "./domain/values/IssueReport";
 import { FileState, MAX_PHASES } from "./core/state";
 import { CODE_SERIALIZERS, CodeSerializerType } from "./utils/codeSerializers";
 
+// ─── Token Budget Helpers ──────────────────────────────────────────────────
+// Claude max context ~102K tokens. We reserve ~50K tokens for the codebase.
+// ~4 chars ≈ 1 token  →  50K tokens ≈ 200K chars budget.
+const CODEBASE_CHAR_BUDGET = 200_000;
+// Max chars kept per individual file before truncating with a summary note.
+const MAX_FILE_CHARS = 12_000;
+
+/**
+ * Truncate files so that the serialized codebase stays within a character
+ * budget.  Larger files are truncated first (most bang for the buck).
+ * Truncated files show their first N lines plus a note about how much was cut.
+ */
+export function truncateFilesToBudget(
+    files: FileState[],
+    budget: number = CODEBASE_CHAR_BUDGET,
+    maxFileChars: number = MAX_FILE_CHARS,
+): FileState[] {
+    if (!files || files.length === 0) return files;
+
+    // First pass: cap each file at maxFileChars
+    const capped: FileState[] = files.map((f) => {
+        const contents = f.fileContents ?? '';
+        if (contents.length <= maxFileChars) return f;
+        const kept = contents.slice(0, maxFileChars);
+        const removedLines = contents.slice(maxFileChars).split('\n').length;
+        return {
+            ...f,
+            fileContents: kept + `\n\n// ... [${removedLines} lines truncated to fit token budget] ...`,
+        };
+    });
+
+    // Second pass: if total is still over budget, drop whole file contents
+    // (keeping just the path) for the largest files until we're within budget.
+    const totalChars = () => capped.reduce((s, f) => s + (f.fileContents?.length ?? 0), 0);
+    // Sort indices by content length descending so we drop the biggest files first.
+    const bySize = [...capped.keys()].sort(
+        (a, b) => (capped[b].fileContents?.length ?? 0) - (capped[a].fileContents?.length ?? 0)
+    );
+    let i = 0;
+    while (totalChars() > budget && i < bySize.length) {
+        const idx = bySize[i];
+        capped[idx] = {
+            ...capped[idx],
+            fileContents: `// [File content omitted – over token budget. Path: ${capped[idx].filePath}]`,
+        };
+        i++;
+    }
+
+    return capped;
+}
+
 export const PROMPT_UTILS = {
     /**
      * Replace template variables in a prompt string
@@ -1311,7 +1362,10 @@ ${staticAnalysisText}
 
 
 export const USER_PROMPT_FORMATTER = {
-    PROJECT_CONTEXT: (phases: PhaseConceptType[], files: FileState[], fileTree: FileTreeNode, commandsHistory: string[], serializerType: CodeSerializerType = CodeSerializerType.SIMPLE) => {
+    PROJECT_CONTEXT: (phases: PhaseConceptType[], files: FileState[], fileTree: FileTreeNode, commandsHistory: string[], serializerType: CodeSerializerType = CodeSerializerType.SIMPLE, tokenBudget: number = CODEBASE_CHAR_BUDGET) => {
+        // Apply token-budget truncation before serialising so we never exceed
+        // the model's context limit regardless of codebase size.
+        files = truncateFilesToBudget(files, tokenBudget);
         let lastPhaseFilesDiff = '';
         try {
             if (phases.length > 1) {

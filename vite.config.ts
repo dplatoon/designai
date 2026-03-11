@@ -1,13 +1,9 @@
-// import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
 import path from 'path';
-
 import { cloudflare } from '@cloudflare/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
-// import { nodePolyfills } from 'vite-plugin-node-polyfills';
-// https://vite.dev/config/
 export default defineConfig({
 	optimizeDeps: {
 		exclude: ['format', 'editor.all'],
@@ -47,11 +43,14 @@ export default defineConfig({
 	build: {
 		sourcemap: false,
 		rollupOptions: {
-			external: ['path', 'node:path', 'node:fs', 'node:os', 'node:crypto', 'node:stream', 'node:buffer', 'node:util', 'node:events', 'node:url', 'node:http', 'node:https', 'node:net', 'node:tls', 'node:zlib', 'node:child_process', 'node:worker_threads'],
+			external: ['path', 'node:path', 'node:fs', 'node:os', 'node:crypto', 'node:stream', 'node:buffer', 'node:util', 'node:events', 'node:url', 'node:http', 'node:https', 'node:net', 'node:tls', 'node:zlib', 'node:child_process', 'node:worker_threads', 'ai'],
 			output: {
 				manualChunks(id) {
 					if (id.includes('node_modules/monaco-editor')) {
 						return 'monaco';
+					}
+					if (id.includes('@sentry')) {
+						return 'sentry';
 					}
 					if (
 						id.includes('node_modules/react/') ||
@@ -77,6 +76,9 @@ export default defineConfig({
 					}
 					if (id.includes('node_modules/date-fns') || id.includes('node_modules/lodash') || id.includes('node_modules/clsx')) {
 						return 'utils';
+					}
+					if (id.includes('node_modules')) {
+						return 'vendor';
 					}
 				},
 			},

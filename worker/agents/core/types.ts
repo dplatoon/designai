@@ -18,7 +18,8 @@ export interface AgentInitArgs {
         templateDetails: TemplateDetails;
         selection: TemplateSelection;
     }
-    sandboxSessionId: string
+    sandboxSessionId: string;
+    agentMode?: 'deterministic' | 'smart';
     images?: ImageAttachment[];
     onBlueprintChunk: (chunk: string) => void;
     // writer: WritableStreamDefaultWriter<{chunk: string}>;

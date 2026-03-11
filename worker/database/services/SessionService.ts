@@ -35,9 +35,9 @@ export class SessionService extends BaseService {
         cleanupInterval: 60 * 60, // 1 hour
         maxConcurrentDevices: 3, // Max 3 devices concurrently
     };
-    
+
     private jwtUtils: JWTUtils;
-    
+
     constructor(
         env: Env
     ) {
@@ -45,7 +45,7 @@ export class SessionService extends BaseService {
         this.jwtUtils = JWTUtils.getInstance(env);
     }
 
-    
+
     /**
      * Log security event for audit purposes
      */
@@ -58,7 +58,7 @@ export class SessionService extends BaseService {
     ): Promise<void> {
         try {
             const metadata = request ? extractRequestMetadata(request) : { ipAddress: 'unknown', userAgent: 'unknown' };
-            
+
             await this.db.db.insert(schema.auditLogs).values({
                 id: generateId(),
                 userId: userId,
@@ -70,7 +70,7 @@ export class SessionService extends BaseService {
                 userAgent: metadata.userAgent,
                 createdAt: new Date()
             });
-            
+
             logger.warn('Security event logged', {
                 userId,
                 sessionId,
@@ -81,7 +81,7 @@ export class SessionService extends BaseService {
             logger.error('Failed to log security event', error);
         }
     }
-    
+
     /**
      * Create a new session
      */
@@ -95,31 +95,31 @@ export class SessionService extends BaseService {
         try {
             // Clean up old sessions for this user
             await this.cleanupUserSessions(userId);
-            
+
             // Generate session ID first
             const sessionId = generateId();
             const userEmail = await this.getUserEmail(userId);
-            
+
             // Generate tokens WITH session ID
             const { accessToken } = await this.jwtUtils.createAccessToken(
                 userId,
                 userEmail,
                 sessionId
             );
-            
+
             // Hash tokens for storage
             const accessTokenHash = await this.jwtUtils.hashToken(accessToken);
-            
+
             // Extract request metadata using centralized utility
             const requestMetadata = extractRequestMetadata(request);
-            
+
             // Create device info object
             const deviceInfo = requestMetadata.userAgent;
-            
+
             // Create session
             const now = new Date();
             const expiresAt = new Date(Date.now() + SessionService.config.sessionTTL * 1000);
-            
+
             await this.db.db.insert(schema.sessions).values({
                 id: sessionId,
                 userId,
@@ -132,16 +132,16 @@ export class SessionService extends BaseService {
                 deviceInfo,
                 createdAt: now
             });
-            
+
             const session: AuthSession = {
                 userId,
                 email: await this.getUserEmail(userId),
                 sessionId,
                 expiresAt: expiresAt,
             };
-            
+
             logger.info('Session created', { userId, sessionId });
-            
+
             return {
                 session,
                 accessToken,
@@ -155,7 +155,7 @@ export class SessionService extends BaseService {
             );
         }
     }
-    
+
     /**
      * Revoke session with ID and userID
      */
@@ -174,7 +174,7 @@ export class SessionService extends BaseService {
                         eq(schema.sessions.userId, userId)
                     )
                 );
-            
+
             logger.info('Session revoked', { sessionId });
         } catch (error) {
             logger.error('Error revoking session', error);
@@ -185,7 +185,7 @@ export class SessionService extends BaseService {
             );
         }
     }
-    
+
     /**
      * Revoke all sessions for a user
      */
@@ -199,7 +199,7 @@ export class SessionService extends BaseService {
                     revokedReason: 'user_force_logout'
                 })
                 .where(eq(schema.sessions.userId, userId));
-            
+
             logger.info('All user sessions revoked', { userId });
         } catch (error) {
             logger.error('Error revoking user sessions', error);
@@ -210,7 +210,7 @@ export class SessionService extends BaseService {
             );
         }
     }
-    
+
     /**
      * Get all active sessions for a user
      */
@@ -261,21 +261,21 @@ export class SessionService extends BaseService {
     async cleanupExpiredSessions(): Promise<number> {
         try {
             const now = new Date();
-            
+
             // Delete expired sessions
             await this.db.db
                 .delete(schema.sessions)
                 .where(lt(schema.sessions.expiresAt, now));
-            
+
             logger.info('Cleaned up expired sessions');
-            
+
             return 0; // D1 doesn't return count
         } catch (error) {
             logger.error('Error cleaning up sessions', error);
             return 0;
         }
     }
-    
+
     /**
      * Clean up old sessions for a user (keep only most recent)
      */
@@ -288,27 +288,27 @@ export class SessionService extends BaseService {
                 .where(eq(schema.sessions.userId, userId))
                 .orderBy(desc(schema.sessions.lastActivity))
                 .all();
-            
+
             // Keep only the most recent sessions
             if (sessions.length > SessionService.config.maxSessions) {
                 const sessionsToDelete = sessions.slice(SessionService.config.maxSessions);
-                
+
                 for (const session of sessionsToDelete) {
                     await this.db.db
                         .delete(schema.sessions)
                         .where(eq(schema.sessions.id, session.id));
                 }
-                
-                logger.debug('Cleaned up old user sessions', { 
-                    userId, 
-                    deleted: sessionsToDelete.length 
+
+                logger.debug('Cleaned up old user sessions', {
+                    userId,
+                    deleted: sessionsToDelete.length
                 });
             }
         } catch (error) {
             logger.error('Error cleaning up user sessions', error);
         }
     }
-    
+
     /**
      * Get user email (helper method)
      */
@@ -318,10 +318,10 @@ export class SessionService extends BaseService {
             .from(schema.users)
             .where(eq(schema.users.id, userId))
             .get();
-        
+
         return user?.email || '';
     }
-    
+
     /**
      * Get security status and recent events for a user
      */
@@ -345,7 +345,7 @@ export class SessionService extends BaseService {
                     )
                 )
                 .all();
-                
+
             // Get recent security events (last 24 hours)
             const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
             const recentEvents = await this.db.db
@@ -363,20 +363,20 @@ export class SessionService extends BaseService {
                 )
                 .orderBy(desc(schema.auditLogs.createdAt))
                 .all();
-                
+
             const activeSessionCount = activeSessions.length;
             const recentSecurityEvents = recentEvents.length;
             const lastSecurityEvent = recentEvents[0]?.createdAt || undefined;
-            
+
             // Determine risk level
             let riskLevel: 'low' | 'medium' | 'high' = 'low';
             const recommendations: string[] = [];
-            
+
             if (activeSessionCount > SessionService.config.maxConcurrentDevices) {
                 riskLevel = 'medium';
                 recommendations.push('Consider revoking old sessions - you have many active sessions');
             }
-            
+
             if (recentSecurityEvents > 5) {
                 riskLevel = 'high';
                 recommendations.push('Multiple security events detected - review your account activity');
@@ -384,18 +384,18 @@ export class SessionService extends BaseService {
                 riskLevel = 'medium';
                 recommendations.push('Some suspicious activity detected - monitor your account');
             }
-            
+
             // Check for session hijacking events
             const hijackingEvents = recentEvents.filter(e => e.action === 'session_hijacking');
             if (hijackingEvents.length > 0) {
                 riskLevel = 'high';
                 recommendations.push('Session hijacking attempts detected - change your password immediately');
             }
-            
+
             if (recommendations.length === 0) {
                 recommendations.push('Your account security looks good');
             }
-            
+
             return {
                 activeSessions: activeSessionCount,
                 recentSecurityEvents,
@@ -413,7 +413,7 @@ export class SessionService extends BaseService {
             };
         }
     }
-    
+
     /**
      * Revoke session by ID
      */
@@ -427,14 +427,14 @@ export class SessionService extends BaseService {
                     revokedReason: 'user_logout'
                 })
                 .where(eq(schema.sessions.id, sessionId));
-            
+
             logger.info('Session revoked by refresh token hash');
         } catch (error) {
             logger.error('Error revoking session by refresh token hash', error);
             // Don't throw error for logout operations
         }
     }
-    
+
     /**
      * Force logout all sessions except current (for security)
      */
@@ -448,9 +448,9 @@ export class SessionService extends BaseService {
                         ne(schema.sessions.id, currentSessionId)
                     )
                 );
-                
+
             const deletedCount = result.meta.changes || 0;
-            
+
             // Log security event
             await this.logSecurityEvent(
                 userId,
@@ -461,9 +461,9 @@ export class SessionService extends BaseService {
                     sessionsRevoked: deletedCount
                 }
             );
-            
+
             logger.info('Force logged out other sessions', { userId, currentSessionId, deletedCount });
-            
+
             return deletedCount;
         } catch (error) {
             logger.error('Error force logging out other sessions', error);

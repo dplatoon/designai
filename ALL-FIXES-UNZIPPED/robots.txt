@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /settings/
+
+Sitemap: https://designai.dev/sitemap.xml
