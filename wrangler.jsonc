@@ -62,7 +62,7 @@
   "dispatch_namespaces": [
     {
       "binding": "DISPATCHER",
-      "namespace": "vibesdk-default-namespace",
+      "namespace": "designai-default-namespace",
       "remote": true
     }
   ],
@@ -84,7 +84,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "vibesdk-db",
+      "database_name": "designai-db",
       "database_id": "4abe6cbc-2058-4773-ba54-93b903c0e9f3",
       "migrations_dir": "migrations",
       "remote": true
@@ -109,13 +109,13 @@
   "r2_buckets": [
     {
       "binding": "TEMPLATES_BUCKET",
-      "bucket_name": "vibesdk-templates",
+      "bucket_name": "designai-templates",
       "remote": true
     }
   ],
   "kv_namespaces": [
     {
-      "binding": "VibecoderStore",
+      "binding": "DesignAIStore",
       "id": "58552cc177b044a2aac33364a08789e9",
       "remote": true
     }
@@ -140,21 +140,20 @@
   ],
   "routes": [
     {
-      "pattern": "build.cloudflare.dev",
+      "pattern": "designai.dev",
       "custom_domain": true
     },
     {
-      "pattern": "*build-preview.cloudflare.dev/*",
-      "custom_domain": false,
-      "zone_id": "db01fac4261b2604aacad8410443a3e2"
+      "pattern": "*designai.dev/*",
+      "custom_domain": false
     }
   ],
   "vars": {
-    "TEMPLATES_REPOSITORY": "https://github.com/cloudflare/vibesdk-templates",
+    "TEMPLATES_REPOSITORY": "https://github.com/Digital-platoon/designai-templates",
     "ALLOWED_EMAIL": "anyone can use it",
-    "DISPATCH_NAMESPACE": "vibesdk-default-namespace",
+    "DISPATCH_NAMESPACE": "designai-default-namespace",
     "ENABLE_READ_REPLICAS": "true",
-    "CLOUDFLARE_AI_GATEWAY": "vibesdk-gateway",
+    "CLOUDFLARE_AI_GATEWAY": "designai-gateway",
     "CUSTOM_DOMAIN": "designai.dev",
     "MAX_SANDBOX_INSTANCES": "10",
     "SANDBOX_INSTANCE_TYPE": "standard-3"

@@ -248,7 +248,7 @@ async function getApiKey(provider: string, env: Env, _userId: string): Promise<s
 
     // Check if apiKey is empty or undefined and is valid
     if (!isValidApiKey(apiKey)) {
-        apiKey = env.CLOUDFLARE_AI_GATEWAY_TOKEN;
+        apiKey = env.CLOUDFLARE_AI_GATEWAY_TOKEN || '';
     }
     return apiKey;
 }
@@ -270,17 +270,17 @@ export async function getConfigurationForModel(
         if (provider === 'openrouter') {
             return {
                 baseURL: 'https://openrouter.ai/api/v1',
-                apiKey: env.OPENROUTER_API_KEY,
+                apiKey: env.OPENROUTER_API_KEY || '',
             };
         } else if (provider === 'gemini') {
             return {
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                apiKey: env.GOOGLE_AI_STUDIO_API_KEY,
+                apiKey: env.GOOGLE_AI_STUDIO_API_KEY || '',
             };
         } else if (provider === 'claude') {
             return {
                 baseURL: 'https://api.anthropic.com/v1/',
-                apiKey: env.ANTHROPIC_API_KEY,
+                apiKey: env.ANTHROPIC_API_KEY || '',
             };
         }
         providerForcedOverride = provider as AIGatewayProviders;
