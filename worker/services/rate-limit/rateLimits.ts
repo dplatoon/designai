@@ -240,6 +240,11 @@ export class RateLimitService {
             return;
         }
 
+
+        if (!config[RateLimitType.LLM_CALLS].enabled) {
+            return;
+        }
+
         const identifier = await this.getUserIdentifier(user);
 
         const key = this.buildRateLimitKey(RateLimitType.LLM_CALLS, identifier);
