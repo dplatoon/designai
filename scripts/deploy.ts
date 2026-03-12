@@ -821,8 +821,8 @@ class CloudflareDeploymentManager {
 		const possibleZones: string[] = [];
 
 		// Generate all possible zone names from longest to shortest
-		// e.g., for 'abc.test.xyz.build.cloudflare.dev' generates:
-		// ['abc.test.xyz.build.cloudflare.dev', 'test.xyz.build.cloudflare.dev', 'xyz.build.cloudflare.dev', 'build.cloudflare.dev', 'cloudflare.dev']
+		// e.g., for 'abc.test.xyz.designai.dev' generates:
+		// ['abc.test.xyz.designai.dev', 'test.xyz.designai.dev', 'xyz.designai.dev', 'designai.dev', 'dev']
 		for (let i = 0; i < domainParts.length - 1; i++) {
 			const zoneName = domainParts.slice(i).join('.');
 			possibleZones.push(zoneName);
@@ -1544,7 +1544,8 @@ class CloudflareDeploymentManager {
 
 		try {
 			// Run build
-			execSync('npm run build', {
+			const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+			execSync(`${npmCommand} run build`, {
 				stdio: 'inherit',
 				cwd: PROJECT_ROOT,
 			});
@@ -1565,7 +1566,8 @@ class CloudflareDeploymentManager {
 		console.log('🚀 Deploying to Cloudflare Workers...');
 
 		try {
-			execSync('npx wrangler deploy', {
+			const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+			execSync(`${npxCommand} wrangler deploy`, {
 				stdio: 'inherit',
 				cwd: PROJECT_ROOT,
 			});
@@ -1806,7 +1808,8 @@ class CloudflareDeploymentManager {
 				return;
 			}
 
-			execSync('wrangler secret bulk .prod.vars', {
+			const wranglerCommand = process.platform === 'win32' ? 'npx.cmd wrangler' : 'npx wrangler';
+			execSync(`${wranglerCommand} secret bulk .prod.vars`, {
 				stdio: 'inherit',
 				cwd: PROJECT_ROOT,
 			});
@@ -1904,8 +1907,9 @@ class CloudflareDeploymentManager {
 	private async runDatabaseMigrations(): Promise<void> {
 		console.log('Running database migrations...');
 		try {
+			const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 			await execSync(
-				'npm run db:generate && npm run db:migrate:remote',
+				`${npmCommand} run db:generate && ${npmCommand} run db:migrate:remote`,
 				{
 					stdio: 'inherit',
 					cwd: PROJECT_ROOT,

@@ -122,6 +122,6 @@ DesignAI implements defense-in-depth security:
 
 ## Credits
 
-Built on top of [Cloudflare VibeSDK](https://github.com/cloudflare/vibesdk) (open source).
+Built with [Cloudflare Workers](https://workers.cloudflare.com/) and [React](https://react.dev/).
 
 Developed by [Digital Platoon](https://github.com/Digital-platoon).

@@ -17,7 +17,7 @@ import { setupStatusRoutes } from './statusRoutes';
 export function setupRoutes(app: Hono<AppEnv>): void {
     // Health check route
     app.get('/api/health', (c) => {
-        console.log('Health check called');
+
         return c.json({ status: 'ok' });
     });
 

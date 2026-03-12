@@ -31,7 +31,7 @@ if (!token) {
     process.exit(1);
 }
 
-const buckets = ['vibesdk-templates'];
+const buckets = ['designai-templates'];
 
 buckets.forEach(bucket => {
     console.log(`\n📦 Checking bucket: ${bucket}`);

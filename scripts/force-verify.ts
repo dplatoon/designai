@@ -28,7 +28,7 @@ function getEnvVars() {
 async function run() {
     const env = getEnvVars();
     console.log('🦾 Force verifying user: hasantawhid2096@gmail.com...');
-    const cmd = `npx wrangler d1 execute vibesdk-db --remote --command="UPDATE users SET email_verified = 1 WHERE email = 'hasantawhid2096@gmail.com';"`;
+    const cmd = `npx wrangler d1 execute designai-db --remote --command="UPDATE users SET email_verified = 1 WHERE email = 'hasantawhid2096@gmail.com';"`;
 
     try {
         const output = execSync(cmd, {

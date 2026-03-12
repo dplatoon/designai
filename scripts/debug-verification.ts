@@ -34,7 +34,7 @@ async function run() {
     const isWindows = process.platform === 'win32';
 
     console.log('🔍 Fetching latest OTPs...');
-    let cmd = `npx wrangler d1 execute vibesdk-db --remote --command="SELECT * FROM verification_otps ORDER BY created_at DESC LIMIT 5;"`;
+    let cmd = `npx wrangler d1 execute designai-db --remote --command="SELECT * FROM verification_otps ORDER BY created_at DESC LIMIT 5;"`;
 
     try {
         const output = execSync(cmd, {
@@ -48,7 +48,7 @@ async function run() {
     }
 
     console.log('\n🔍 Fetching unverified users...');
-    cmd = `npx wrangler d1 execute vibesdk-db --remote --command="SELECT id, email, email_verified FROM users WHERE email_verified = 0;"`;
+    cmd = `npx wrangler d1 execute designai-db --remote --command="SELECT id, email, email_verified FROM users WHERE email_verified = 0;"`;
     try {
         const output = execSync(cmd, {
             env: { ...process.env, ...env },

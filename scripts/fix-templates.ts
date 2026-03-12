@@ -24,7 +24,7 @@ function getEnvVars() {
 
 const envVars = getEnvVars();
 const token = envVars.CLOUDFLARE_API_TOKEN;
-const bucketName = 'vibesdk-templates';
+const bucketName = 'designai-templates';
 
 if (!token) {
     console.error('CLOUDFLARE_API_TOKEN not found in .prod.vars');

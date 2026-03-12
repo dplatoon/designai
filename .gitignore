@@ -40,3 +40,19 @@ debugging.ipynb
 # Sentry Config File
 .env.sentry-build-plugin
 data-dump
+
+# Artifacts & Local Tools
+*.zip
+*.bak
+logs.json
+build_log.txt
+debug-tools/
+ALL-FIXES-UNZIPPED/
+minimal-js-unzipped/
+.mcp.json
+check_apps.sql
+test-d1.ts
+*.patch
+wrangler_prev.jsonc
+tsconfig.tsbuildinfo
+tsc_errors.log

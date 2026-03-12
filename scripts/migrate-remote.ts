@@ -41,7 +41,7 @@ async function run() {
     // Step 2: Apply migrations
     console.log('  🚢 Applying migrations to remote D1...');
     // We don't use 'CI=true' prefix here, we just run wrangler directly with env vars
-    const cmd = `npx wrangler d1 migrations apply vibesdk-db --remote`;
+    const cmd = `npx wrangler d1 migrations apply designai-db --remote`;
 
     try {
         const output = execSync(cmd, {

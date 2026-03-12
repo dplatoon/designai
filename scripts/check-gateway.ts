@@ -26,9 +26,9 @@ function getEnvVars() {
 
 async function checkGateway() {
     const env = getEnvVars();
-    const url = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai-gateway/gateways/vibesdk-gateway`;
+    const url = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai-gateway/gateways/designai-gateway`;
 
-    console.log(`🔍 Checking AI Gateway: vibesdk-gateway`);
+    console.log(`🔍 Checking AI Gateway: designai-gateway`);
 
     try {
         const response = await fetch(url, {

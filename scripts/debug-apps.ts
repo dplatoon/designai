@@ -30,7 +30,7 @@ async function run() {
     console.log('📋 Checking application state...');
 
     // Check apps table
-    const cmd = `npx wrangler d1 execute vibesdk-db --remote --command="SELECT * FROM apps ORDER BY created_at DESC LIMIT 5;"`;
+    const cmd = `npx wrangler d1 execute designai-db --remote --command="SELECT * FROM apps ORDER BY created_at DESC LIMIT 5;"`;
 
     try {
         const output = execSync(cmd, {

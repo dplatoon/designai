@@ -85,7 +85,7 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
 		});
 	}
 
-	// Extract the app name (e.g., "xyz" from "xyz.build.cloudflare.dev").
+	// Extract the app name (e.g., "xyz" from "xyz.designai.dev").
 	const appName = hostname.split('.')[0];
 	const dispatcher = env['DISPATCHER'];
 
@@ -178,7 +178,7 @@ const worker = {
 				hostname.endsWith(`.${previewDomain}`) ||
 				(hostname.endsWith('.localhost') && hostname !== 'localhost');
 
-			// Route 1: Main Platform Request (e.g., build.cloudflare.dev or localhost)
+			// Route 1: Main Platform Request (e.g., designai.dev or localhost)
 			if (isMainDomainRequest) {
 				// Serve static assets for all non-API routes from the ASSETS binding.
 				if (!pathname.startsWith('/api/')) {
@@ -198,7 +198,7 @@ const worker = {
 				return app.fetch(request, env, ctx);
 			}
 
-			// Route 2: User App Request (e.g., xyz.build.cloudflare.dev or test.localhost)
+			// Route 2: User App Request (e.g., xyz.designai.dev or test.localhost)
 			if (isSubdomainRequest) {
 				return handleUserAppRequest(request, env);
 			}
@@ -219,7 +219,7 @@ const worker = {
 				success: false,
 				error: {
 					message: error.message || 'Fatal worker error',
-					stack: error.stack
+					stack: env.ENVIRONMENT === 'dev' ? error.stack : undefined
 				}
 			}), {
 				status: 500,
