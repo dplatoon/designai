@@ -4,6 +4,7 @@ import svgr from 'vite-plugin-svgr';
 import path from 'path';
 import { cloudflare } from '@cloudflare/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 export default defineConfig({
 	optimizeDeps: {
 		exclude: ['format', 'editor.all'],
@@ -11,6 +12,14 @@ export default defineConfig({
 		force: true,
 	},
 	plugins: [
+		nodePolyfills({
+			include: ['os', 'path', 'crypto', 'stream', 'util', 'buffer', 'events', 'process', 'fs', 'url'],
+			globals: {
+				process: true,
+				Buffer: true,
+				global: true,
+			},
+		}),
 		react(),
 		svgr(),
 		cloudflare({
@@ -21,6 +30,7 @@ export default defineConfig({
 	],
 	resolve: {
 		alias: {
+			mimetext: 'mimetext/browser',
 			debug: 'debug/src/browser',
 			'@': path.resolve(__dirname, './src'),
 			'shared': path.resolve(__dirname, './shared'),
@@ -43,7 +53,7 @@ export default defineConfig({
 	build: {
 		sourcemap: false,
 		rollupOptions: {
-			external: ['path', 'node:path', 'node:fs', 'node:os', 'node:crypto', 'node:stream', 'node:buffer', 'node:util', 'node:events', 'node:url', 'node:http', 'node:https', 'node:net', 'node:tls', 'node:zlib', 'node:child_process', 'node:worker_threads', 'ai'],
+			external: ['ai', 'cloudflare:workers', 'cloudflare:email'],
 			output: {
 				manualChunks(id) {
 					if (id.includes('node_modules/monaco-editor')) {

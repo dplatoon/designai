@@ -616,20 +616,25 @@ class CloudflareDeploymentManager {
 			}
 
 			// Check if deploy script exists
-			const deployScript = join(templatesDir, 'deploy_templates.sh');
+			const deployScript = join(templatesDir, 'deploy_templates.ts');
+			let isNodeScript = true;
 			if (!existsSync(deployScript)) {
-				console.warn(
-					'⚠️  deploy_templates.sh not found in templates repository, skipping template deployment',
-				);
-				return;
-			}
-
-			// Make script executable - skip on Windows as chmod doesn't exist
-			if (process.platform !== 'win32') {
-				try {
-					execSync(`chmod +x "${deployScript}"`, { cwd: templatesDir });
-				} catch (chmodError) {
-					console.warn(`⚠️  Failed to make script executable: ${chmodError instanceof Error ? chmodError.message : String(chmodError)}`);
+				const fallbackScript = join(templatesDir, 'deploy_templates.sh');
+				if (!existsSync(fallbackScript)) {
+					console.warn(
+						'⚠️  deploy_templates script not found in templates repository, skipping template deployment',
+					);
+					return;
+				}
+				isNodeScript = false;
+				
+				// Make script executable - skip on Windows as chmod doesn't exist
+				if (process.platform !== 'win32') {
+					try {
+						execSync(`chmod +x "${fallbackScript}"`, { cwd: templatesDir });
+					} catch (chmodError) {
+						console.warn(`⚠️  Failed to make script executable: ${chmodError instanceof Error ? chmodError.message : String(chmodError)}`);
+					}
 				}
 			}
 
@@ -646,8 +651,8 @@ class CloudflareDeploymentManager {
 				R2_BUCKET_NAME: templatesBucket.bucket_name,
 			};
 
-			// On Windows, use 'sh' or 'bash' to run the script if available
-			const deployCommand = process.platform === 'win32' ? `sh "${deployScript}"` : `./deploy_templates.sh`;
+			const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+			const deployCommand = isNodeScript ? `${npxCommand} tsx deploy_templates.ts` : (process.platform === 'win32' ? `sh "deploy_templates.sh"` : `./deploy_templates.sh`);
 
 			execSync(deployCommand, {
 				stdio: 'inherit',
