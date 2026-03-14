@@ -254,7 +254,7 @@ export function useChat({
 					}
 				}, 30000);
 
-				ws.addEventListener('open', () => {
+				const onOpen = () => {
 					// Ignore stale open events
 					if (!shouldReconnectRef.current) {
 						ws.close();
@@ -287,27 +287,27 @@ export function useChat({
 						sendWebSocketMessage(ws, 'generate_all');
 					}
 					// For existing chats, auto-resume happens via cf_agent_state
-				});
+				};
 
-				ws.addEventListener('message', (event) => {
+				const onMessage = (event: MessageEvent) => {
 					try {
 						const message: WebSocketMessage = JSON.parse(event.data);
 						handleWebSocketMessage(ws, message);
 					} catch (parseError) {
 						logger.error('❌ Error parsing WebSocket message:', parseError, event.data);
 					}
-				});
+				};
 
-				ws.addEventListener('error', (error) => {
+				const onError = (error: Event) => {
 					clearTimeout(connectionTimeout);
 					// Only handle error for the latest attempt and when we should reconnect
 					if (myAttemptId !== connectAttemptIdRef.current) return;
 					if (!shouldReconnectRef.current) return;
 					logger.error('❌ WebSocket error:', error);
 					handleConnectionFailure(wsUrl, disableGenerate, 'WebSocket error');
-				});
+				};
 
-				ws.addEventListener('close', (event) => {
+				const onClose = (event: CloseEvent) => {
 					clearTimeout(connectionTimeout);
 					logger.info(
 						`🔌 WebSocket connection closed with code ${event.code}: ${event.reason || 'No reason provided'}`,
@@ -318,12 +318,22 @@ export function useChat({
 					if (!shouldReconnectRef.current) return;
 					// Retry on any close while mounted (including 1000) to improve resilience
 					handleConnectionFailure(wsUrl, disableGenerate, `Connection closed (code: ${event.code})`);
-				});
+				};
+
+				ws.addEventListener('open', onOpen);
+				ws.addEventListener('message', onMessage);
+				ws.addEventListener('error', onError);
+				ws.addEventListener('close', onClose);
 
 				return function disconnect() {
 					clearTimeout(connectionTimeout);
+					ws.removeEventListener('open', onOpen);
+					ws.removeEventListener('message', onMessage);
+					ws.removeEventListener('error', onError);
+					ws.removeEventListener('close', onClose);
 					ws.close();
 				};
+
 			} catch (error) {
 				logger.error('❌ Error establishing WebSocket connection:', error);
 				handleConnectionFailure(wsUrl, disableGenerate, 'Connection setup failed');

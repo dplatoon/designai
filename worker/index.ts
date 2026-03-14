@@ -7,7 +7,6 @@ import * as Sentry from '@sentry/cloudflare';
 import { sentryOptions } from './observability/sentry';
 import { DORateLimitStore as BaseDORateLimitStore } from './services/rate-limit/DORateLimitStore';
 import { getPreviewDomain } from './utils/urls';
-import { guardEnv } from './utils/envGuard';
 // Durable Object and Service exports
 export { UserAppSandboxService, DeployerService } from './services/sandbox/sandboxSdkClient';
 
@@ -86,7 +85,7 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
 		});
 	}
 
-	// Extract the app name (e.g., "xyz" from "xyz.build.cloudflare.dev").
+	// Extract the app name (e.g., "xyz" from "xyz.designai.dev").
 	const appName = hostname.split('.')[0];
 	const dispatcher = env['DISPATCHER'];
 
@@ -148,29 +147,6 @@ const worker = {
 					headers: { 'Content-Type': 'application/json' }
 				});
 			}
-		console.log(`Received request: ${request.method} ${request.url}`);
-
-		// 0. Validate critical environment variables
-		const envError = guardEnv(env);
-		if (envError) return envError;
-
-		// --- Pre-flight Checks ---
-
-		// 1. Critical configuration check: Ensure custom domain is set.
-		const previewDomain = getPreviewDomain(env);
-		if (!previewDomain || previewDomain.trim() === '') {
-			console.error('FATAL: env.CUSTOM_DOMAIN is not configured in wrangler.toml or the Cloudflare dashboard.');
-			return new Response('Server configuration error: Application domain is not set.', { status: 500 });
-		}
-
-		const url = new URL(request.url);
-		const { hostname, pathname } = url;
-
-		// 2. Security: Immediately reject any requests made via an IP address.
-		const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-		if (ipRegex.test(hostname)) {
-			return new Response('Access denied. Please use the assigned domain name.', { status: 403 });
-		}
 
 			const url = new URL(request.url);
 			const { hostname, pathname } = url;
@@ -202,7 +178,7 @@ const worker = {
 				hostname.endsWith(`.${previewDomain}`) ||
 				(hostname.endsWith('.localhost') && hostname !== 'localhost');
 
-			// Route 1: Main Platform Request (e.g., build.cloudflare.dev or localhost)
+			// Route 1: Main Platform Request (e.g., designai.dev or localhost)
 			if (isMainDomainRequest) {
 				// Serve static assets for all non-API routes from the ASSETS binding.
 				if (!pathname.startsWith('/api/')) {
@@ -222,7 +198,7 @@ const worker = {
 				return app.fetch(request, env, ctx);
 			}
 
-			// Route 2: User App Request (e.g., xyz.build.cloudflare.dev or test.localhost)
+			// Route 2: User App Request (e.g., xyz.designai.dev or test.localhost)
 			if (isSubdomainRequest) {
 				return handleUserAppRequest(request, env);
 			}
@@ -243,7 +219,7 @@ const worker = {
 				success: false,
 				error: {
 					message: error.message || 'Fatal worker error',
-					stack: error.stack
+					stack: env.ENVIRONMENT === 'dev' ? error.stack : undefined
 				}
 			}), {
 				status: 500,
@@ -253,5 +229,4 @@ const worker = {
 	}
 } satisfies ExportedHandler<Env>;
 
-// export default worker;
 export default Sentry.withSentry(sentryOptions, worker);

@@ -26,11 +26,9 @@ export function setupAuthRoutes(app: Hono<AppEnv>): void {
     authRouter.get('/check', setAuthLevel(AuthConfig.public), adaptController(AuthController, AuthController.checkAuth));
 
     // Protected routes (require authentication) - must come before dynamic OAuth routes
-    authRouter.get('/profile', setAuthLevel(AuthConfig.authenticatedUnverified), adaptController(AuthController, AuthController.getProfile));
+    authRouter.get('/profile', setAuthLevel(AuthConfig.authenticated), adaptController(AuthController, AuthController.getProfile));
     authRouter.put('/profile', setAuthLevel(AuthConfig.authenticated), adaptController(AuthController, AuthController.updateProfile));
     authRouter.post('/logout', setAuthLevel(AuthConfig.authenticated), adaptController(AuthController, AuthController.logout));
-    authRouter.post('/logout', setAuthLevel(AuthConfig.authenticatedUnverified), adaptController(AuthController, AuthController.logout));
-
 
     // Session management routes
     authRouter.get('/sessions', setAuthLevel(AuthConfig.authenticated), adaptController(AuthController, AuthController.getActiveSessions));

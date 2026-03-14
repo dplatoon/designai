@@ -4,7 +4,7 @@
  */
 
 import * as schema from '../schema';
-import { eq, and, sql, or, lt, isNull, gt, desc } from 'drizzle-orm';
+import { eq, and, sql, or, lt, isNull } from 'drizzle-orm';
 import { JWTUtils } from '../../utils/jwtUtils';
 import { generateSecureToken } from '../../utils/cryptoUtils';
 import { SessionService } from './SessionService';
@@ -22,13 +22,12 @@ import {
     AuthUser,
     OAuthProvider
 } from '../../types/auth-types';
+import { mapUserResponse } from '../../utils/authUtils';
 import { createLogger } from '../../logger';
 import { validateEmail, validatePassword } from '../../utils/validationUtils';
-import { extractRequestMetadata, mapUserResponse } from '../../utils/authUtils';
+import { extractRequestMetadata } from '../../utils/authUtils';
 import { BaseService } from './BaseService';
 import { sendVerificationEmail, resendVerificationEmail, verifyEmailOTP, sendPasswordResetEmail } from '../../services/email/EmailService';
-import { EmailService } from '../../services/email/EmailService';
-import { validateRedirectUrl } from '../../utils/redirectValidation';
 
 const logger = createLogger('AuthService');
 
@@ -56,7 +55,6 @@ export interface RegistrationData {
 export class AuthService extends BaseService {
     private readonly sessionService: SessionService;
     private readonly passwordService: PasswordService;
-    private readonly emailService: EmailService;
 
     constructor(
         env: Env,
@@ -64,7 +62,6 @@ export class AuthService extends BaseService {
         super(env);
         this.sessionService = new SessionService(env);
         this.passwordService = new PasswordService();
-        this.emailService = new EmailService(env);
     }
 
     /**
@@ -118,14 +115,12 @@ export class AuthService extends BaseService {
             const now = new Date();
 
             // Store user as unverified initially
-            // Store user as unverified
             await this.database.insert(schema.users).values({
                 id: userId,
                 email: data.email.toLowerCase(),
                 passwordHash,
                 displayName: data.name || data.email.split('@')[0],
                 emailVerified: false, // Set as unverified by default
-                emailVerified: false, // Do not set as verified immediately
                 provider: 'email',
                 providerId: userId,
                 createdAt: now,
@@ -155,13 +150,6 @@ export class AuthService extends BaseService {
             logger.info('User registered and logged in directly', { userId, email: data.email });
 
             // Create session and tokens immediately (log user in after registration)
-            logger.info('User registered, verification required', { userId, email: data.email });
-
-            // Generate and store verification OTP
-            await this.generateAndStoreVerificationOtp(data.email.toLowerCase());
-
-            // Create temporary session for the user even if unverified
-            // The frontend can use this to show the verification screen
             const { accessToken, session } = await this.sessionService.createSession(
                 userId,
                 request
@@ -172,7 +160,6 @@ export class AuthService extends BaseService {
                 sessionId: session.sessionId,
                 expiresAt: session.expiresAt,
                 accessToken,
-                requiresEmailVerification: true
             };
         } catch (error) {
             await this.logAuthAttempt(data.email, 'register', false, request);
@@ -247,7 +234,6 @@ export class AuthService extends BaseService {
                 accessToken,
                 sessionId: session.sessionId,
                 expiresAt: session.expiresAt,
-                requiresEmailVerification: !user.emailVerified
             };
         } catch (error) {
             if (error instanceof SecurityError) {
@@ -320,7 +306,7 @@ export class AuthService extends BaseService {
         // Validate and sanitize intended redirect URL
         let validatedRedirectUrl: string | null = null;
         if (intendedRedirectUrl) {
-            validatedRedirectUrl = this.validateOAuthRedirectUrl(intendedRedirectUrl, request);
+            validatedRedirectUrl = this.validateRedirectUrl(intendedRedirectUrl, request);
         }
 
         // Generate state for CSRF protection
@@ -552,7 +538,6 @@ export class AuthService extends BaseService {
 
     /**
      * Validate and sanitize redirect URL to prevent open redirect attacks
-     * Delegates to the centralized redirect validation utility
      */
     private validateRedirectUrl(redirectUrl: string, request: Request): string | null {
         try {
@@ -591,82 +576,11 @@ export class AuthService extends BaseService {
     }
 
     /**
-    private validateOAuthRedirectUrl(redirectUrl: string, request: Request): string | null {
-        return validateRedirectUrl(redirectUrl, { request });
-    }
-
-    /**
-     * Generate and store verification OTP for email
-     */
-    private async generateAndStoreVerificationOtp(email: string): Promise<void> {
-        // Generate a cryptographically secure 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes expiry
-
-        // Hash the OTP for secure storage
-        const hashedOtp = await this.passwordService.hash(otp);
-
-        // Store OTP in database
-        await this.database.insert(schema.verificationOtps).values({
-            id: generateId(),
-            email: email.toLowerCase(),
-            otp: hashedOtp,
-            expiresAt,
-            createdAt: new Date(),
-            used: false
-        });
-
-        // Send verification email via Resend
-        await this.emailService.sendVerificationEmail(email.toLowerCase(), otp);
-
-        logger.info('Verification OTP generated, stored and emailed', { email });
-    }
-
-    /**
      * Verify email with OTP
      */
     async verifyEmailWithOtp(email: string, otp: string, request: Request): Promise<AuthResult> {
         try {
             // Find the user by email first to get their ID
-            // Find valid OTP
-            const storedOtp = await this.database
-                .select()
-                .from(schema.verificationOtps)
-                .where(
-                    and(
-                        eq(schema.verificationOtps.email, email.toLowerCase()),
-                        eq(schema.verificationOtps.used, false),
-                        gt(schema.verificationOtps.expiresAt, new Date())
-                    )
-                )
-                .orderBy(desc(schema.verificationOtps.createdAt))
-                .get();
-
-            if (!storedOtp) {
-                throw new SecurityError(
-                    SecurityErrorType.INVALID_INPUT,
-                    'Invalid or expired verification code',
-                    400
-                );
-            }
-
-            // Verify OTP
-            const otpValid = await this.passwordService.verify(otp, storedOtp.otp);
-            if (!otpValid) {
-                throw new SecurityError(
-                    SecurityErrorType.INVALID_INPUT,
-                    'Invalid verification code',
-                    400
-                );
-            }
-
-            // Mark OTP as used
-            await this.database
-                .update(schema.verificationOtps)
-                .set({ used: true, usedAt: new Date() })
-                .where(eq(schema.verificationOtps.id, storedOtp.id));
-
-            // Find and verify the user
             const user = await this.database
                 .select()
                 .from(schema.users)
@@ -784,7 +698,6 @@ export class AuthService extends BaseService {
     async validateTokenAndGetUser(token: string, _env: Env): Promise<AuthUserSession | null> {
         try {
             const jwtUtils = JWTUtils.getInstance(this.env as any);
-            const jwtUtils = JWTUtils.getInstance(env as { JWT_SECRET: string });
             const payload = await jwtUtils.verifyToken(token);
 
             if (!payload || payload.type !== 'access') {
@@ -851,9 +764,6 @@ export class AuthService extends BaseService {
                     429
                 );
             }
-
-            // Generate new OTP
-            await this.generateAndStoreVerificationOtp(email.toLowerCase());
 
             logger.info('Verification OTP resent', { email });
         } catch (error) {

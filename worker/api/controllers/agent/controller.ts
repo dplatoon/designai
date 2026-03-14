@@ -61,10 +61,10 @@ export class CodingAgentController extends BaseController {
             const writer = writable.getWriter();
             // Check if user is authenticated
             const user = context.user;
-            const userId = user?.id || body.userId || null;
+            const userId = user?.id || (body as any).userId || null;
 
             try {
-                await RateLimitService.enforceAppCreationRateLimit(env, context.config.security.rateLimit, user, request);
+                await RateLimitService.enforceAppCreationRateLimit(env, context.config.security.rateLimit, user as any, request);
             } catch (error) {
                 if (error instanceof Error) {
                     return CodingAgentController.createErrorResponse(error, 429);

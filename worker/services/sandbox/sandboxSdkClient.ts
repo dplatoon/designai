@@ -111,7 +111,7 @@ export class SandboxSdkClient extends BaseSandboxService {
     private envVars?: Record<string, string>;
 
     constructor(sandboxId: string, envVars?: Record<string, string>) {
-        if ((env as any).ALLOCATION_STRATEGY === AllocationStrategy.MANY_TO_ONE) {
+        if (env.ALLOCATION_STRATEGY === AllocationStrategy.MANY_TO_ONE) {
             sandboxId = getAutoAllocatedSandbox(sandboxId);
         }
         super(sandboxId);
@@ -480,7 +480,6 @@ export class SandboxSdkClient extends BaseSandboxService {
 
             // Parse the combined output
             const sections = bulkResult.stdout.split('===FILE:').filter((section: string) => section.trim());
-            const sections = bulkResult.stdout.split('===FILE:').filter(section => section.trim());
 
             for (const section of sections) {
                 try {
@@ -875,7 +874,7 @@ export class SandboxSdkClient extends BaseSandboxService {
 
             // If on local development, start cloudflared tunnel
             let tunnelUrlPromise = Promise.resolve('');
-            if (isDev(env) || (env as any).USE_TUNNEL_FOR_PREVIEW === 'true') {
+            if (isDev(env) || env.USE_TUNNEL_FOR_PREVIEW) {
                 this.logger.info('Starting cloudflared tunnel for local development', { instanceId });
                 tunnelUrlPromise = this.startCloudflaredTunnel(instanceId, allocatedPort);
             }
@@ -909,7 +908,6 @@ export class SandboxSdkClient extends BaseSandboxService {
                     }
 
                     if (env.USE_TUNNEL_FOR_PREVIEW) {
-                    if ((env as any).USE_TUNNEL_FOR_PREVIEW === 'true') {
                         this.logger.info('Using tunnel url instead for preview as configured', { instanceId, tunnelURL });
                         previewURL = tunnelURL;
                     }
@@ -963,7 +961,7 @@ export class SandboxSdkClient extends BaseSandboxService {
 
     async createInstance(templateName: string, projectName: string, webhookUrl?: string, localEnvVars?: Record<string, string>): Promise<BootstrapResponse> {
         try {
-            if ((env as any).ALLOCATION_STRATEGY === 'one_to_one') {
+            if (env.ALLOCATION_STRATEGY === 'one_to_one') {
                 // Multiple instances shouldn't exist in the same sandbox
 
                 // If there are already instances running in sandbox, log them
@@ -994,7 +992,6 @@ export class SandboxSdkClient extends BaseSandboxService {
             const instanceId = `i-${generateId()}`;
             this.logger.info('Creating sandbox instance', { instanceId, templateName, projectName });
 
-            let results: { previewURL: string, tunnelURL: string, processId: string, allocatedPort: number } | undefined;
             await this.ensureTemplateExists(templateName);
 
             const [donttouchFiles, redactedFiles] = await Promise.all([
@@ -1824,7 +1821,6 @@ export class SandboxSdkClient extends BaseSandboxService {
             // Step 2: Parse wrangler config from KV
             this.logger.info('Reading wrangler configuration from KV');
             const wranglerConfigContent = await env.DesignAIStore.get(this.getWranglerKVKey(instanceId));
-            let wranglerConfigContent = await env.VibecoderStore.get(this.getWranglerKVKey(instanceId));
 
             if (!wranglerConfigContent) {
                 // This should never happen unless KV itself has some issues
@@ -1864,7 +1860,6 @@ export class SandboxSdkClient extends BaseSandboxService {
                     const findResult = await sandbox.exec(`find ${workerAssetsPath} -type f -name "*.js"`);
                     if (findResult.exitCode === 0) {
                         const modulePaths = findResult.stdout.trim().split('\n').filter((path: string) => path);
-                        const modulePaths = findResult.stdout.trim().split('\n').filter(path => path);
 
                         if (modulePaths.length > 0) {
                             additionalModules = new Map<string, string>();
@@ -1993,7 +1988,6 @@ export class SandboxSdkClient extends BaseSandboxService {
         }
 
         const filePaths = findResult.stdout.trim().split('\n').filter((path: string) => path);
-        const filePaths = findResult.stdout.trim().split('\n').filter(path => path);
         this.logger.info('Asset files found', { count: filePaths.length });
 
         const fileContents = new Map<string, Buffer>();

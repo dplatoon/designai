@@ -248,7 +248,7 @@ async function getApiKey(provider: string, env: Env, _userId: string): Promise<s
 
     // Check if apiKey is empty or undefined and is valid
     if (!isValidApiKey(apiKey)) {
-        apiKey = (env.CLOUDFLARE_AI_GATEWAY_TOKEN as string) || '';
+        apiKey = env.CLOUDFLARE_AI_GATEWAY_TOKEN || '';
     }
     return apiKey;
 }
@@ -270,17 +270,17 @@ export async function getConfigurationForModel(
         if (provider === 'openrouter') {
             return {
                 baseURL: 'https://openrouter.ai/api/v1',
-                apiKey: (env.OPENROUTER_API_KEY as string) || '',
+                apiKey: env.OPENROUTER_API_KEY || '',
             };
         } else if (provider === 'gemini') {
             return {
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                apiKey: (env.GOOGLE_AI_STUDIO_API_KEY as string) || '',
+                apiKey: env.GOOGLE_AI_STUDIO_API_KEY || '',
             };
         } else if (provider === 'claude') {
             return {
                 baseURL: 'https://api.anthropic.com/v1/',
-                apiKey: (env.ANTHROPIC_API_KEY as string) || '',
+                apiKey: env.ANTHROPIC_API_KEY || '',
             };
         }
         providerForcedOverride = provider as AIGatewayProviders;
@@ -454,23 +454,19 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
     }
 
     try {
-        // Resolve a non-null userId for rate limiting and config lookups
-        const resolvedUserId = metadata.userId ?? '';
-
         const authUser: AuthUser = {
-            id: resolvedUserId || 'anonymous',
-            email: 'platform-agent@system.internal',
+            id: metadata.userId || 'anonymous',
+            email: 'unknown@platform.local',
             displayName: undefined,
             username: undefined,
-            avatarUrl: undefined,
-            isAnonymous: !metadata.userId
+            avatarUrl: undefined
         };
 
-        const userConfig = await getUserConfigurableSettings(env, resolvedUserId)
+        const userConfig = await getUserConfigurableSettings(env, metadata.userId || 'anonymous');
         // Maybe in the future can expand using config object for other stuff like global model configs?
-        await RateLimitService.enforceLLMCallsRateLimit(env, userConfig.security.rateLimit, authUser)
+        await RateLimitService.enforceLLMCallsRateLimit(env, userConfig.security.rateLimit, authUser);
 
-        const { apiKey, baseURL, defaultHeaders } = await getConfigurationForModel(modelName, env, resolvedUserId);
+        const { apiKey, baseURL, defaultHeaders } = await getConfigurationForModel(modelName, env, metadata.userId || 'anonymous');
         console.log(`baseUrl: ${baseURL}, modelName: ${modelName}`);
 
         // Remove [*.] from model name
@@ -481,8 +477,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                 ? { response_format: zodResponseFormat(schema, schemaName) }
                 : {};
 
-
-        const extraBody = modelName.includes('claude') ? {
+        const extraBody = (modelName.includes('claude') || modelName.includes('3.5-sonnet')) ? {
             extra_body: {
                 thinking: {
                     type: 'enabled',
@@ -500,23 +495,6 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
         if (toolCallContext && toolCallContext.messages) {
             messagesToPass.push(...toolCallContext.messages);
         }
-
-        // ── Pre-flight token-budget guard ───────────────────────────────────
-        // Estimate token count: ~4 characters ≈ 1 token (conservative).
-        // Claude's hard limit is ~102K tokens; we reject at 95K to leave
-        // headroom for the model's response tokens.
-        const MAX_PAYLOAD_CHARS = 380_000; // 95K tokens * 4 chars/token
-        const payloadChars = JSON.stringify(messagesToPass).length;
-        const estimatedTokens = Math.round(payloadChars / 4);
-        console.log(`Pre-flight payload estimate: ~${estimatedTokens.toLocaleString()} tokens (${payloadChars.toLocaleString()} chars)`);
-        if (payloadChars > MAX_PAYLOAD_CHARS) {
-            throw new RateLimitExceededError(
-                `Prompt too large: estimated ~${estimatedTokens.toLocaleString()} tokens exceeds the model's context limit. ` +
-                `Please start a new conversation or reduce the amount of context being sent.`,
-                RateLimitType.LLM_CALLS
-            );
-        }
-        // ────────────────────────────────────────────────────────────────────
 
         if (format) {
             if (!schema || !schemaName) {

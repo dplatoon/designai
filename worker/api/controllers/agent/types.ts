@@ -8,9 +8,6 @@ export interface CodeGenArgs {
     selectedTemplate?: string;
     agentMode: 'deterministic' | 'smart';
     images?: ImageAttachment[];
-    userId?: string;
-    enableRealtimeCodeFix?: boolean;
-    enableFastSmartCodeFix?: boolean;
 }
 
 /**
@@ -21,5 +18,4 @@ export interface AgentConnectionData {
     agentId: string;
 }
 
-export interface AgentPreviewResponse extends PreviewType {
-}
+export type AgentPreviewResponse = PreviewType;
