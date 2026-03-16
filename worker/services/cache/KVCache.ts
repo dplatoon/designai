@@ -4,7 +4,7 @@ export interface KVCacheOptions {
 }
 
 export class KVCache {
-    constructor(private kv: KVNamespace) {}
+    constructor(private kv: KVNamespace) { }
 
     private generateKey(prefix: string, key: string): string {
         return `cache-${prefix}:${key}`;
@@ -45,6 +45,6 @@ export class KVCache {
 }
 
 export function createKVCache(env: Env): KVCache {
-    const kv = env.VibecoderStore;
+    const kv = env.DesignAIStore;
     return new KVCache(kv);
 }

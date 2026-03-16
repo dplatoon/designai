@@ -27,7 +27,7 @@ export interface CloudflareD1DatabaseResponse {
         name: string;
         version: string;
         num_tables: number;
-        file_size: number;
+        file_size: number; // Reverted malformed edit
         running_in_region: string;
     };
 }
@@ -39,9 +39,9 @@ export class ResourceProvisioner {
 
     constructor(logger: StructuredLogger) {
         this.logger = logger;
-        this.accountId = env.CLOUDFLARE_ACCOUNT_ID;
-        this.apiToken = env.CLOUDFLARE_API_TOKEN;
-        
+        this.accountId = (env as any).CLOUDFLARE_ACCOUNT_ID || '';
+        this.apiToken = (env as any).CLOUDFLARE_API_TOKEN || '';
+
         if (!this.accountId || !this.apiToken) {
             this.logger.error('Missing required environment variables for resource provisioning', {
                 hasAccountId: !!this.accountId,
@@ -49,7 +49,7 @@ export class ResourceProvisioner {
             });
             throw new Error('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN must be set for resource provisioning');
         }
-        
+
         this.logger.info('ResourceProvisioner initialized successfully', {
             accountId: this.accountId.substring(0, 8) + '...'
         });
@@ -65,10 +65,10 @@ export class ResourceProvisioner {
     async createKVNamespace(projectName: string): Promise<ResourceProvisionResult> {
         try {
             this.logger.info(`Creating KV namespace for project: ${projectName}`);
-            
+
             const namespaceName = `${projectName}-kv-${Date.now()}`;
             const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/storage/kv/namespaces`;
-            
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: this.getCloudflareHeaders(),
@@ -87,7 +87,7 @@ export class ResourceProvisioner {
             }
 
             const result: CloudflareKVNamespaceResponse = await response.json();
-            
+
             if (!result.success || !result.result?.id) {
                 this.logger.error('KV namespace creation failed', result.errors);
                 return {
@@ -117,10 +117,10 @@ export class ResourceProvisioner {
     async createD1Database(projectName: string): Promise<ResourceProvisionResult> {
         try {
             this.logger.info(`Creating D1 database for project: ${projectName}`);
-            
+
             const databaseName = `${projectName}-db-${Date.now()}`;
             const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/d1/database`;
-            
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: this.getCloudflareHeaders(),
@@ -139,7 +139,7 @@ export class ResourceProvisioner {
             }
 
             const result: CloudflareD1DatabaseResponse = await response.json();
-            
+
             if (!result.success || !result.result?.uuid) {
                 this.logger.error('D1 database creation failed', result.errors);
                 return {

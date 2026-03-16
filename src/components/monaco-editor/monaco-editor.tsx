@@ -189,24 +189,32 @@ export const MonacoEditor = memo<MonacoEditorProps>(function MonacoEditor({
 
 		// Add scroll listener to detect user interaction
 		const editorDomNode = editor.current.getDomNode();
-		if (editorDomNode) {
-			editorDomNode.addEventListener('wheel', () => {
+		
+		const onWheel = () => {
+			if (stickyScroll.current) {
+				stickyScroll.current = false;
+			}
+		};
+
+		const onKeyDown = (e: KeyboardEvent) => {
+			// Disable sticky scroll on arrow keys, Page Up/Down
+			if (e.key.includes('Arrow') || e.key.includes('Page')) {
 				if (stickyScroll.current) {
 					stickyScroll.current = false;
 				}
-			});
+			}
+		};
 
-			editorDomNode.addEventListener('keydown', (e) => {
-				// Disable sticky scroll on arrow keys, Page Up/Down
-				if (e.key.includes('Arrow') || e.key.includes('Page')) {
-					if (stickyScroll.current) {
-						stickyScroll.current = false;
-					}
-				}
-			});
+		if (editorDomNode) {
+			editorDomNode.addEventListener('wheel', onWheel);
+			editorDomNode.addEventListener('keydown', onKeyDown);
 		}
 
 		return () => {
+			if (editorDomNode) {
+				editorDomNode.removeEventListener('wheel', onWheel);
+				editorDomNode.removeEventListener('keydown', onKeyDown);
+			}
 			editor.current?.dispose();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps

@@ -12,7 +12,7 @@ export default defineWorkersConfig({
       },
     },
     globals: true,
-    setupFiles: ['./test/setup.ts'],
+    // setupFiles: ['./test/setup.ts'],
     include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/.git/**', '**/test/**', '**/worker/api/routes/**'],
   },

@@ -83,21 +83,21 @@ export default function DiscoverPage() {
 							onFrameworkChange={handleFrameworkChange}
 							onPeriodChange={handlePeriodChange}
 							sortBy={sortBy}
-					/>
+						/>
 
 						{/* Sort Tabs */}
-					<AppSortTabs
-						value={sortBy}
-						onValueChange={(v) => {
-							handleSortChange(v);
-							// Persist to URL and localStorage
-							try { localStorage.setItem('discover.sort', v); } catch {}
-							const next = new URLSearchParams(searchParams);
-							next.set('sort', v);
-							setSearchParams(next, { replace: true });
-						}}
-						availableSorts={['recent', 'popular', 'trending', 'starred']}
-					/>
+						<AppSortTabs
+							value={sortBy}
+							onValueChange={(v) => {
+								handleSortChange(v);
+								// Persist to URL and localStorage
+								try { localStorage.setItem('discover.sort', v); } catch { /* localStorage unavailable */ }
+								const next = new URLSearchParams(searchParams);
+								next.set('sort', v);
+								setSearchParams(next, { replace: true });
+							}}
+							availableSorts={['recent', 'popular', 'trending', 'starred']}
+						/>
 					</div>
 
 					{/* Unified App List */}

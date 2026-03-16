@@ -9,13 +9,13 @@ import { CsrfService } from './services/csrf/CsrfService';
 import { SecurityError, SecurityErrorType } from 'shared/types/errors';
 import { getGlobalConfigurableSettings } from './config';
 import { AuthConfig, setAuthLevel } from './middleware/auth/routeAuth';
-// import { initHonoSentry } from './observability/sentry';
+import { initHonoSentry } from './observability/sentry';
 
 export function createApp(env: Env): Hono<AppEnv> {
     const app = new Hono<AppEnv>();
 
     // Observability: Sentry error reporting & context
-    // initHonoSentry(app);
+    initHonoSentry(app);
 
     // Apply global security middlewares (skip for WebSocket upgrades)
     app.use('*', async (c, next) => {
@@ -27,40 +27,42 @@ export function createApp(env: Env): Hono<AppEnv> {
         // Apply secure headers
         return secureHeaders(getSecureHeadersConfig(env))(c, next);
     });
-    
+
     // CORS configuration
     app.use('/api/*', cors(getCORSConfig(env)));
-    
+
     // CSRF protection using double-submit cookie pattern with proper GET handling
     app.use('*', async (c, next) => {
         const method = c.req.method.toUpperCase();
-        
+
         // Skip for WebSocket upgrades
         const upgradeHeader = c.req.header('upgrade');
         if (upgradeHeader?.toLowerCase() === 'websocket') {
             return next();
         }
-        
+
         try {
             // Handle GET requests - establish CSRF token if needed
             if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
                 await next();
-                
+
                 // Only set CSRF token for successful API responses
-                if (c.req.url.startsWith('/api/') && c.res.status < 400) {
+                // BUT skip for the csrf-token endpoint itself (it sets its own token)
+                const pathname = new URL(c.req.url).pathname;
+                if (pathname.startsWith('/api/') && !pathname.includes('/csrf-token') && c.res.status < 400) {
                     await CsrfService.enforce(c.req.raw, c.res);
                 }
-                
+
                 return;
             }
-            
+
             // Validate CSRF token for state-changing requests
             await CsrfService.enforce(c.req.raw, undefined);
             await next();
         } catch (error) {
             if (error instanceof SecurityError && error.type === SecurityErrorType.CSRF_VIOLATION) {
-                return new Response(JSON.stringify({ 
-                    error: { 
+                return new Response(JSON.stringify({
+                    error: {
                         message: 'CSRF validation failed',
                         type: SecurityErrorType.CSRF_VIOLATION
                     }
@@ -88,6 +90,19 @@ export function createApp(env: Env): Hono<AppEnv> {
 
     // Now setup all the routes
     setupRoutes(app);
+
+    // Add global error handler
+    app.onError((err, c) => {
+        console.error('FATAL HONO ERROR:', err);
+        return c.json({
+            success: false,
+            error: {
+                type: 'INTERNAL_SERVER_ERROR',
+                message: err.message || 'An unexpected error occurred',
+                stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+            }
+        }, 500);
+    });
 
     // Add not found route to redirect to ASSETS
     app.notFound((c) => {

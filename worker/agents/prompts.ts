@@ -6,6 +6,57 @@ import { IssueReport } from "./domain/values/IssueReport";
 import { FileState, MAX_PHASES } from "./core/state";
 import { CODE_SERIALIZERS, CodeSerializerType } from "./utils/codeSerializers";
 
+// ─── Token Budget Helpers ──────────────────────────────────────────────────
+// Claude max context ~102K tokens. We reserve ~50K tokens for the codebase.
+// ~4 chars ≈ 1 token  →  50K tokens ≈ 200K chars budget.
+const CODEBASE_CHAR_BUDGET = 200_000;
+// Max chars kept per individual file before truncating with a summary note.
+const MAX_FILE_CHARS = 12_000;
+
+/**
+ * Truncate files so that the serialized codebase stays within a character
+ * budget.  Larger files are truncated first (most bang for the buck).
+ * Truncated files show their first N lines plus a note about how much was cut.
+ */
+export function truncateFilesToBudget(
+    files: FileState[],
+    budget: number = CODEBASE_CHAR_BUDGET,
+    maxFileChars: number = MAX_FILE_CHARS,
+): FileState[] {
+    if (!files || files.length === 0) return files;
+
+    // First pass: cap each file at maxFileChars
+    const capped: FileState[] = files.map((f) => {
+        const contents = f.fileContents ?? '';
+        if (contents.length <= maxFileChars) return f;
+        const kept = contents.slice(0, maxFileChars);
+        const removedLines = contents.slice(maxFileChars).split('\n').length;
+        return {
+            ...f,
+            fileContents: kept + `\n\n// ... [${removedLines} lines truncated to fit token budget] ...`,
+        };
+    });
+
+    // Second pass: if total is still over budget, drop whole file contents
+    // (keeping just the path) for the largest files until we're within budget.
+    const totalChars = () => capped.reduce((s, f) => s + (f.fileContents?.length ?? 0), 0);
+    // Sort indices by content length descending so we drop the biggest files first.
+    const bySize = [...capped.keys()].sort(
+        (a, b) => (capped[b].fileContents?.length ?? 0) - (capped[a].fileContents?.length ?? 0)
+    );
+    let i = 0;
+    while (totalChars() > budget && i < bySize.length) {
+        const idx = bySize[i];
+        capped[idx] = {
+            ...capped[idx],
+            fileContents: `// [File content omitted – over token budget. Path: ${capped[idx].filePath}]`,
+        };
+        i++;
+    }
+
+    return capped;
+}
+
 export const PROMPT_UTILS = {
     /**
      * Replace template variables in a prompt string
@@ -14,27 +65,27 @@ export const PROMPT_UTILS = {
      */
     replaceTemplateVariables(template: string, variables: Record<string, string>): string {
         let result = template;
-        
+
         for (const [key, value] of Object.entries(variables)) {
             const placeholder = `{{${key}}}`;
             result = result.replaceAll(placeholder, value ?? '');
         }
-        
+
         return result;
     },
 
     serializeTreeNodes(node: FileTreeNode): string {
         // The output starts with the root node's name.
         const outputParts: string[] = [node.path.split('/').pop() || node.path];
-    
+
         function processChildren(children: FileTreeNode[], prefix: string) {
             children.forEach((child, index) => {
                 const isLast = index === children.length - 1;
                 const connector = isLast ? '└── ' : '├── ';
                 const displayName = child.path.split('/').pop() || child.path;
-    
+
                 outputParts.push(prefix + connector + displayName);
-    
+
                 // If the child is a directory with its own children, recurse deeper.
                 if (child.type === 'directory' && child.children && child.children.length > 0) {
                     // The prefix for the next level depends on whether the current node
@@ -44,12 +95,12 @@ export const PROMPT_UTILS = {
                 }
             });
         }
-    
+
         // Start the process if the root node has children.
         if (node.children && node.children.length > 0) {
             processChildren(node.children, '');
         }
-    
+
         return outputParts.join('\n');
     },
 
@@ -110,8 +161,8 @@ and provide a preview url for the application.
                 const errorText = e.message;
                 // Remove any trace lines with no 'tsx' or 'ts' extension in them
                 const cleanedText = errorText.split('\n')
-                                    .map(line => line.includes('/deps/') && !(line.includes('.tsx') || line.includes('.ts')) ? '...' : line)
-                                    .join('\n');
+                    .map(line => line.includes('/deps/') && !(line.includes('.tsx') || line.includes('.ts')) ? '...' : line)
+                    .join('\n');
                 // Truncate to 1000 characters to prevent context overflow
                 return `<error>${cleanedText.slice(0, 1000)}</error>`;
             });
@@ -124,7 +175,7 @@ and provide a preview url for the application.
     serializeStaticAnalysis(staticAnalysis: StaticAnalysisResponse): string {
         const lintOutput = staticAnalysis.lint?.rawOutput || 'No linting issues detected';
         const typecheckOutput = staticAnalysis.typecheck?.rawOutput || 'No type checking issues detected';
-        
+
         return `**LINT ANALYSIS:**
 ${lintOutput}
 
@@ -689,7 +740,7 @@ const handleClick = useCallback(() => setCount(prev => prev + 1), []);
 ⚠️⚠️⚠️ THESE RULES OVERRIDE ALL OTHER CONSIDERATIONS INCLUDING CODE AESTHETICS ⚠️⚠️⚠️
 ⚠️⚠️⚠️ IF YOU WRITE FORBIDDEN PATTERNS, YOU MUST IMMEDIATELY REWRITE THE FILE ⚠️⚠️⚠️`,
 
-COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
+    COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
     **TOP 6 MISSION-CRITICAL RULES (FAILURE WILL CRASH THE APP):**
     1. **DEPENDENCY VALIDATION:** BEFORE writing any import statement, verify it exists in <DEPENDENCIES>. Common failures: @xyflow/react uses { ReactFlow } not default import, @/lib/utils for cn function. If unsure, check the dependency list first.
     2. **IMPORT & EXPORT INTEGRITY:** Ensure every component, function, or variable is correctly defined and imported properly (and exported properly). Mismatched default/named imports will cause crashes. NEVER write \`import React, 'react';\` - always use \`import React from 'react';\`
@@ -1218,8 +1269,8 @@ export const STRATEGIES = {
     **This is a Cloudflare Workers & Durable Objects project. The environment is preconfigured. Absolutely DO NOT Propose changes to wrangler.toml or any other config files. These config files are hidden from you but they do exist.**
     **The Homepage of the frontend is a dummy page. It should be rewritten as the primary page of the application in the initial phase.**
     **Refrain from editing any of the 'dont touch' files in the project, e.g - package.json, vite.config.ts, wrangler.jsonc, etc.**
-</PHASES GENERATION STRATEGY>`, 
-FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
+</PHASES GENERATION STRATEGY>`,
+    FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
     **STRATEGY: Scalable, Demoable Frontend and core application First / Iterative Feature Addition later**
     The project would be developed live: The user (client) would be provided a preview link after each phase. This is our rapid development and delivery paradigm.
     The core principle is to establish a visually complete and polished frontend presentation early on with core functionalities implemented, before layering in more advanced functionality and fleshing out the backend.
@@ -1233,17 +1284,18 @@ FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
     ${STRATEGIES_UTILS.CODING_GUIDELINES}
 
     **Make sure to implement all the features and functionality requested by the user and more. The application should be fully complete by the end of the last phase. There should be no compromises**
-</PHASES GENERATION STRATEGY>`, 
+</PHASES GENERATION STRATEGY>`,
 }
 
 export interface GeneralSystemPromptBuilderParams {
-    query: string,
-    templateDetails: TemplateDetails,
-    dependencies: Record<string, string>,
-    blueprint?: Blueprint,
-    language?: string,
-    frameworks?: string[],
-    templateMetaInfo?: TemplateSelection,
+    query: string;
+    templateDetails: TemplateDetails;
+    dependencies: Record<string, string>;
+    blueprint?: Blueprint;
+    language?: string;
+    frameworks?: string[];
+    templateMetaInfo?: TemplateSelection;
+    extraVariables?: Record<string, string>;
 }
 
 export function generalSystemPromptBuilder(
@@ -1274,6 +1326,11 @@ export function generalSystemPromptBuilder(
         variables.usecaseSpecificInstructions = getUsecaseSpecificInstructions(params.templateMetaInfo);
     }
 
+    // Include any extra variables provided
+    if (params.extraVariables) {
+        Object.assign(variables, params.extraVariables);
+    }
+
     const formattedPrompt = PROMPT_UTILS.replaceTemplateVariables(prompt, variables);
     return PROMPT_UTILS.verifyPrompt(formattedPrompt);
 }
@@ -1281,7 +1338,7 @@ export function generalSystemPromptBuilder(
 export function issuesPromptFormatter(issues: IssueReport): string {
     const runtimeErrorsText = PROMPT_UTILS.serializeErrors(issues.runtimeErrors);
     const staticAnalysisText = PROMPT_UTILS.serializeStaticAnalysis(issues.staticAnalysis);
-    
+
     return `## ERROR ANALYSIS PRIORITY MATRIX
 
 ### 1. CRITICAL RUNTIME ERRORS (Fix First - Deployment Blockers)
@@ -1305,7 +1362,10 @@ ${staticAnalysisText}
 
 
 export const USER_PROMPT_FORMATTER = {
-    PROJECT_CONTEXT: (phases: PhaseConceptType[], files: FileState[], fileTree: FileTreeNode, commandsHistory: string[], serializerType: CodeSerializerType = CodeSerializerType.SIMPLE) => {
+    PROJECT_CONTEXT: (phases: PhaseConceptType[], files: FileState[], fileTree: FileTreeNode, commandsHistory: string[], serializerType: CodeSerializerType = CodeSerializerType.SIMPLE, tokenBudget: number = CODEBASE_CHAR_BUDGET) => {
+        // Apply token-budget truncation before serialising so we never exceed
+        // the model's context limit regardless of codebase size.
+        files = truncateFilesToBudget(files, tokenBudget);
         let lastPhaseFilesDiff = '';
         try {
             if (phases.length > 1) {
@@ -1316,7 +1376,7 @@ export const USER_PROMPT_FORMATTER = {
                     files.forEach((file) => fileMap.set(file.filePath, file));
                     const lastPhaseFiles = lastPhase.files.map((file) => fileMap.get(file.path)).filter((file) => file !== undefined);
                     lastPhaseFilesDiff = lastPhaseFiles.map((file) => file.lastDiff).join('\n');
-        
+
                     // Set lastPhase = false for all phases but the last
                     phases.forEach((phase) => {
                         if (phase !== lastPhase) {
@@ -1344,7 +1404,7 @@ ${commandsHistory.join('\n')}
         };
 
         const prompt = PROMPT_UTILS.replaceTemplateVariables(PROMPT_UTILS.PROJECT_CONTEXT, variables);
-        
+
         return PROMPT_UTILS.verifyPrompt(prompt);
     },
 };
@@ -1372,13 +1432,13 @@ const getStyleInstructions = (style: TemplateSelection['styleSelection']): strin
 - Example Elements: Cartoon-style characters, brushstroke fonts, animated SVGs.
 - Heading Font options: Playfair Display, Fredericka the Great, Great Vibes
             `
-//         case 'Neumorphism':
-//             return `
-// **Style Name: Neumorphism (Soft UI)**
-// - Use a soft pastel background, high-contrast accent colors for functional elements e.g. navy, coral, or bright blue. Avoid monochrome UIs
-// - Light shadow (top-left) and dark shadow (bottom-right) to simulate extrusion or embedding, Keep shadows subtle but visible to prevent a washed-out look.
-// - Avoid excessive transparency in text — keep readability high.
-// - Integrate glassmorphism subtly`;
+        //         case 'Neumorphism':
+        //             return `
+        // **Style Name: Neumorphism (Soft UI)**
+        // - Use a soft pastel background, high-contrast accent colors for functional elements e.g. navy, coral, or bright blue. Avoid monochrome UIs
+        // - Light shadow (top-left) and dark shadow (bottom-right) to simulate extrusion or embedding, Keep shadows subtle but visible to prevent a washed-out look.
+        // - Avoid excessive transparency in text — keep readability high.
+        // - Integrate glassmorphism subtly`;
         case `Kid_Playful`:
             return `
 **Style Name: Kid Playful**

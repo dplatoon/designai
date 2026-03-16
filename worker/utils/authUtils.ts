@@ -2,20 +2,20 @@
  * Centralized Authentication Utilities
  */
 
-import type {  AuthUser } from '../types/auth-types';
+import type { AuthUser } from '../types/auth-types';
 import type { User } from '../database/schema';
 
 /**
  * Extract sessionId from cookie
 */
 export function extractSessionId(request: Request): string | null {
-    const cookieHeader = request.headers.get('Cookie');
-       if (!cookieHeader) {
-               return null;
-       }
+	const cookieHeader = request.headers.get('Cookie');
+	if (!cookieHeader) {
+		return null;
+	}
 
-       const cookies = parseCookies(cookieHeader);
-       return cookies['sessionId'];
+	const cookies = parseCookies(cookieHeader);
+	return cookies['sessionId'];
 }
 
 
@@ -105,7 +105,11 @@ export function parseCookies(cookieHeader: string): Record<string, string> {
 	const pairs = cookieHeader.split(';');
 
 	for (const pair of pairs) {
-		const [key, value] = pair.trim().split('=');
+		const trimmed = pair.trim();
+		const eqIndex = trimmed.indexOf('=');
+		if (eqIndex === -1) continue;
+		const key = trimmed.substring(0, eqIndex).trim();
+		const value = trimmed.substring(eqIndex + 1).trim();
 		if (key && value) {
 			cookies[key] = decodeURIComponent(value);
 		}
@@ -249,8 +253,9 @@ export function extractRequestMetadata(request: Request): RequestMetadata {
  */
 export interface SessionResponse {
 	user: AuthUser;
-    sessionId: string;
-    expiresAt: Date | null;
+	sessionId: string;
+	expiresAt: Date | null;
+	requiresEmailVerification?: boolean;
 }
 
 export function mapUserResponse(
@@ -280,9 +285,15 @@ export function formatAuthResponse(
 	user: AuthUser,
 	sessionId: string,
 	expiresAt: Date | null,
+	requiresEmailVerification?: boolean
 ): SessionResponse {
-	const response: SessionResponse = { user, sessionId, expiresAt };
-    
+	const response: SessionResponse = {
+		user,
+		sessionId,
+		expiresAt,
+		requiresEmailVerification
+	};
+
 	return response;
 }
 

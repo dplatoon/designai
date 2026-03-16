@@ -189,10 +189,10 @@ function optimizeTextContent(content: string): string {
 
 export async function buildGatewayUrl(env: Env, providerOverride?: AIGatewayProviders): Promise<string> {
     // If CLOUDFLARE_AI_GATEWAY_URL is set and is a valid URL, use it directly
-    if (env.CLOUDFLARE_AI_GATEWAY_URL && 
-        env.CLOUDFLARE_AI_GATEWAY_URL !== 'none' && 
+    if (env.CLOUDFLARE_AI_GATEWAY_URL &&
+        env.CLOUDFLARE_AI_GATEWAY_URL !== 'none' &&
         env.CLOUDFLARE_AI_GATEWAY_URL.trim() !== '') {
-        
+
         try {
             const url = new URL(env.CLOUDFLARE_AI_GATEWAY_URL);
             // Validate it's actually an HTTP/HTTPS URL
@@ -207,7 +207,7 @@ export async function buildGatewayUrl(env: Env, providerOverride?: AIGatewayProv
             console.warn(`Invalid CLOUDFLARE_AI_GATEWAY_URL provided: ${env.CLOUDFLARE_AI_GATEWAY_URL}. Falling back to AI bindings.`);
         }
     }
-    
+
     // Build the url via bindings
     const gateway = env.AI.gateway(env.CLOUDFLARE_AI_GATEWAY);
     const baseUrl = providerOverride ? await gateway.getUrl(providerOverride) : `${await gateway.getUrl()}compat`;
@@ -245,17 +245,17 @@ async function getApiKey(provider: string, env: Env, _userId: string): Promise<s
     const providerKeyString = provider.toUpperCase().replaceAll('-', '_');
     const envKey = `${providerKeyString}_API_KEY` as keyof Env;
     let apiKey: string = env[envKey] as string;
-    
+
     // Check if apiKey is empty or undefined and is valid
     if (!isValidApiKey(apiKey)) {
-        apiKey = env.CLOUDFLARE_AI_GATEWAY_TOKEN;
+        apiKey = env.CLOUDFLARE_AI_GATEWAY_TOKEN || '';
     }
     return apiKey;
 }
 
 export async function getConfigurationForModel(
-    model: AIModels | string, 
-    env: Env, 
+    model: AIModels | string,
+    env: Env,
     userId: string,
 ): Promise<{
     baseURL: string,
@@ -270,17 +270,17 @@ export async function getConfigurationForModel(
         if (provider === 'openrouter') {
             return {
                 baseURL: 'https://openrouter.ai/api/v1',
-                apiKey: env.OPENROUTER_API_KEY,
+                apiKey: env.OPENROUTER_API_KEY || '',
             };
         } else if (provider === 'gemini') {
             return {
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                apiKey: env.GOOGLE_AI_STUDIO_API_KEY,
+                apiKey: env.GOOGLE_AI_STUDIO_API_KEY || '',
             };
         } else if (provider === 'claude') {
             return {
                 baseURL: 'https://api.anthropic.com/v1/',
-                apiKey: env.ANTHROPIC_API_KEY,
+                apiKey: env.ANTHROPIC_API_KEY || '',
             };
         }
         providerForcedOverride = provider as AIGatewayProviders;
@@ -307,7 +307,7 @@ export async function getConfigurationForModel(
 type InferArgsBase = {
     env: Env;
     metadata: InferenceMetadata;
-    actionKey: AgentActionKey  | 'testModelConfig';
+    actionKey: AgentActionKey | 'testModelConfig';
     messages: Message[];
     maxTokens?: number;
     modelName: AIModels | string;
@@ -386,7 +386,7 @@ async function executeToolCalls(openAiToolCalls: ChatCompletionMessageFunctionTo
                     name: tc.function.name,
                     arguments: {},
                     result: { error: `Failed to execute ${tc.function.name}: ${error instanceof Error ? error.message : 'Unknown error'}` }
-            };
+                };
             }
         })
     );
@@ -438,7 +438,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
     if (messages.length > MAX_LLM_MESSAGES) {
         throw new RateLimitExceededError(`Message limit exceeded: ${messages.length} messages (max: ${MAX_LLM_MESSAGES}). Please use context compactification.`, RateLimitType.LLM_CALLS);
     }
-    
+
     // Check tool calling depth to prevent infinite recursion
     const currentDepth = toolCallContext?.depth ?? 0;
     if (currentDepth >= MAX_TOOL_CALLING_DEPTH) {
@@ -447,44 +447,44 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
         if (schema) {
             throw new Error(`Maximum tool calling depth (${MAX_TOOL_CALLING_DEPTH}) exceeded. Tools may be calling each other recursively.`);
         }
-        return { 
+        return {
             string: `[System: Maximum tool calling depth reached.]`,
-            toolCallContext 
+            toolCallContext
         };
     }
-    
+
     try {
         const authUser: AuthUser = {
-            id: metadata.userId,
+            id: metadata.userId || 'anonymous',
             email: 'unknown@platform.local',
             displayName: undefined,
             username: undefined,
             avatarUrl: undefined
         };
 
-        const userConfig = await getUserConfigurableSettings(env, metadata.userId)
+        const userConfig = await getUserConfigurableSettings(env, metadata.userId || 'anonymous');
         // Maybe in the future can expand using config object for other stuff like global model configs?
-        await RateLimitService.enforceLLMCallsRateLimit(env, userConfig.security.rateLimit, authUser)
+        await RateLimitService.enforceLLMCallsRateLimit(env, userConfig.security.rateLimit, authUser);
 
-        const { apiKey, baseURL, defaultHeaders } = await getConfigurationForModel(modelName, env, metadata.userId);
+        const { apiKey, baseURL, defaultHeaders } = await getConfigurationForModel(modelName, env, metadata.userId || 'anonymous');
         console.log(`baseUrl: ${baseURL}, modelName: ${modelName}`);
 
         // Remove [*.] from model name
         modelName = modelName.replace(/\[.*?\]/, '');
 
-        const client = new OpenAI({ apiKey, baseURL: baseURL, defaultHeaders });
         const schemaObj =
             schema && schemaName && !format
                 ? { response_format: zodResponseFormat(schema, schemaName) }
                 : {};
-        const extraBody = modelName.includes('claude')? {
-                    extra_body: {
-                        thinking: {
-                            type: 'enabled',
-                            budget_tokens: claude_thinking_budget_tokens[reasoning_effort ?? 'medium'],
-                        },
-                    },
-                }
+
+        const extraBody = (modelName.includes('claude') || modelName.includes('3.5-sonnet')) ? {
+            extra_body: {
+                thinking: {
+                    type: 'enabled',
+                    budget_tokens: claude_thinking_budget_tokens[reasoning_effort ?? 'medium'],
+                },
+            },
+        }
             : {};
 
         // Optimize messages to reduce token count
@@ -542,35 +542,92 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
 
         const toolsOpts = tools ? { tools, tool_choice: 'auto' as const } : {};
         let response: OpenAI.ChatCompletion | OpenAI.ChatCompletionChunk | Stream<OpenAI.ChatCompletionChunk>;
-        try {
-            // Call OpenAI API with proper structured output format
-            response = await client.chat.completions.create({
-                ...schemaObj,
-                ...extraBody,
-                ...toolsOpts,
-                model: modelName,
-                messages: messagesToPass as OpenAI.ChatCompletionMessageParam[],
-                max_completion_tokens: maxTokens || 150000,
-                stream: stream ? true : false,
-                reasoning_effort,
-                temperature,
-            }, {
-                headers: {
-                    "cf-aig-metadata": JSON.stringify({
-                        chatId: metadata.agentId,
-                        userId: metadata.userId,
-                        schemaName,
-                        actionKey,
-                    })
+
+        // Execute inference with retry logic and fallback
+        const maxRetries = 3;
+        let lastError: any = null;
+        let currentBaseURL = baseURL;
+        let currentApiKey = apiKey;
+        let isDirectFallback = false;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const currentClient = new OpenAI({
+                    apiKey: currentApiKey,
+                    baseURL: currentBaseURL,
+                    defaultHeaders
+                });
+
+                // Call OpenAI API with proper structured output format
+                response = await currentClient.chat.completions.create({
+                    ...schemaObj,
+                    ...extraBody,
+                    ...toolsOpts,
+                    model: modelName,
+                    messages: messagesToPass as OpenAI.ChatCompletionMessageParam[],
+                    max_completion_tokens: maxTokens || 150000,
+                    stream: stream ? true : false,
+                    reasoning_effort,
+                    temperature,
+                }, {
+                    headers: {
+                        "cf-aig-metadata": JSON.stringify({
+                            chatId: metadata.agentId,
+                            userId: metadata.userId,
+                            schemaName,
+                            actionKey,
+                        })
+                    }
+                });
+
+                console.log(`Inference response received on attempt ${attempt}`);
+                break; // Success!
+
+            } catch (error: any) {
+                lastError = error;
+                console.error(`Attempt ${attempt} failed:`, error);
+
+                // Handle rate limits
+                if (error.status === 429) {
+                    console.warn('Rate limit exceeded (429), backing off...');
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                        continue;
+                    }
                 }
-            });
-            console.log(`Inference response received`);
-        } catch (error) {
-            console.error(`Failed to get inference response from OpenAI: ${error}`);
-            if ((error instanceof Error && error.message.includes('429')) || (typeof error === 'string' && error.includes('429'))) {
-                throw new RateLimitExceededError('Rate limit exceeded in LLM calls, Please try again later', RateLimitType.LLM_CALLS);
+
+                // If AI Gateway is failing (500, 404, or non-JSON response), attempt direct fallback for Gemini/Google or OpenAI models
+                if (!isDirectFallback) {
+                    if ((modelName.includes('gemini') || modelName.includes('google')) && env.GOOGLE_AI_STUDIO_API_KEY) {
+                        console.log('Attempting direct Gemini API fallback...');
+                        currentBaseURL = 'https://generativelanguage.googleapis.com/v1beta/openai/';
+                        currentApiKey = env.GOOGLE_AI_STUDIO_API_KEY;
+                        isDirectFallback = true;
+                        continue;
+                    } else if (modelName.includes('gpt-') && env.OPENAI_API_KEY) {
+                        console.log('Attempting direct OpenAI API fallback...');
+                        currentBaseURL = 'https://api.openai.com/v1/';
+                        currentApiKey = env.OPENAI_API_KEY;
+                        isDirectFallback = true;
+                        continue;
+                    }
+                }
+
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+                    continue;
+                }
+
+                // If we reach here, we've exhausted retries
+                if (error.status === 429) {
+                    throw new RateLimitExceededError('Rate limit exceeded in LLM calls. Please try again later.', RateLimitType.LLM_CALLS);
+                }
+                throw error;
             }
-            throw error;
+        }
+
+        if (!response!) {
+            throw lastError || new Error('Failed to get response from AI model after multiple attempts');
         }
         let toolCalls: ChatCompletionMessageFunctionToolCall[] = [];
 
@@ -583,16 +640,16 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                 const byIndex = new Map<number, ToolAccumulatorEntry>();
                 const byId = new Map<string, ToolAccumulatorEntry>();
                 const orderCounterRef = { value: 0 };
-                
+
                 for await (const event of response) {
                     const delta = (event as ChatCompletionChunk).choices[0]?.delta;
-                    
+
                     // Provider-specific logging
                     const provider = modelName.split('/')[0];
                     if (delta?.tool_calls && (provider === 'google-ai-studio' || provider === 'gemini')) {
                         console.log(`[PROVIDER_DEBUG] ${provider} tool_calls delta:`, JSON.stringify(delta.tool_calls, null, 2));
                     }
-                    
+
                     if (delta?.tool_calls) {
                         try {
                             for (const deltaToolCall of delta.tool_calls as ToolCallsArray) {
@@ -602,7 +659,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                             console.error('Error processing tool calls in streaming:', error);
                         }
                     }
-                    
+
                     // Process content
                     content += delta?.content || '';
                     const slice = content.slice(streamIndex);
@@ -612,10 +669,10 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                         streamIndex += slice.length;
                     }
                 }
-                
+
                 // Assemble toolCalls with preference for index ordering, else first-seen order
                 toolCalls = assembleToolCalls(byIndex, byId);
-                
+
                 // Validate accumulated tool calls (do not mutate arguments)
                 for (const toolCall of toolCalls) {
                     if (!toolCall.function.name) {
@@ -691,10 +748,10 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                 messages: newMessages,
                 depth: newDepth
             };
-            
+
             const executedCallsWithResults = executedToolCalls.filter(result => result.result);
             console.log(`Tool calling depth: ${newDepth}/${MAX_TOOL_CALLING_DEPTH}`);
-            
+
             if (executedCallsWithResults.length) {
                 if (schema && schemaName) {
                     const output = await infer<OutputSchema>({

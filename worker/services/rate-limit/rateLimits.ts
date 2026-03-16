@@ -11,15 +11,15 @@ export class RateLimitService {
     static logger = createObjectLogger(this, 'RateLimitService');
 
     static buildRateLimitKey(
-		rateLimitType: RateLimitType,
-		identifier: string
-	): string {
-		return `platform:${rateLimitType}:${identifier}`;
-	}
+        rateLimitType: RateLimitType,
+        identifier: string
+    ): string {
+        return `platform:${rateLimitType}:${identifier}`;
+    }
 
-	static async getUserIdentifier(user: AuthUser): Promise<string> {
-		return `user:${user.id}`;
-	}
+    static async getUserIdentifier(user: AuthUser): Promise<string> {
+        return `user:${user.id}`;
+    }
 
     static async getRequestIdentifier(request: Request): Promise<string> {
         const tokenResult = extractTokenWithMetadata(request);
@@ -31,7 +31,7 @@ export class RateLimitService {
             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
             return `token:${hashHex.slice(0, 16)}`;
         }
-    
+
         const metadata = extractRequestMetadata(request);
         return `ip:${metadata.ipAddress}`;
     }
@@ -72,20 +72,20 @@ export class RateLimitService {
             return true; // Fail open
         }
     }
-    
+
     static async enforce(
         env: Env,
         key: string,
         config: RateLimitSettings,
         limitType: RateLimitType
-    ) : Promise<boolean> {
+    ): Promise<boolean> {
         // If dev, don't enforce
         if (isDev(env)) {
             return true;
         }
         const rateLimitConfig = config[limitType];
         let success = false;
-        
+
         switch (rateLimitConfig.store) {
             case RateLimitStore.RATE_LIMITER: {
                 const result = await (env[rateLimitConfig.bindingName as keyof Env] as RateLimit).limit({ key });
@@ -93,7 +93,7 @@ export class RateLimitService {
                 break;
             }
             case RateLimitStore.KV: {
-                const result = await KVRateLimitStore.increment(env.VibecoderStore, key, rateLimitConfig as KVRateLimitConfig);
+                const result = await KVRateLimitStore.increment(env.DesignAIStore, key, rateLimitConfig as KVRateLimitConfig);
                 success = result.success;
                 break;
             }
@@ -118,7 +118,7 @@ export class RateLimitService {
         const identifier = await this.getUniversalIdentifier(user, request);
 
         const key = this.buildRateLimitKey(RateLimitType.API_RATE_LIMIT, identifier);
-        
+
         try {
             const success = await this.enforce(env, key, config, RateLimitType.API_RATE_LIMIT);
             if (!success) {
@@ -151,14 +151,14 @@ export class RateLimitService {
         user: AuthUser | null,
         request: Request
     ) {
-        
+
         if (!config[RateLimitType.AUTH_RATE_LIMIT].enabled) {
             return;
         }
         const identifier = await this.getUniversalIdentifier(user, request);
 
         const key = this.buildRateLimitKey(RateLimitType.AUTH_RATE_LIMIT, identifier);
-        
+
         try {
             const success = await this.enforce(env, key, config, RateLimitType.AUTH_RATE_LIMIT);
             if (!success) {
@@ -185,91 +185,96 @@ export class RateLimitService {
         }
     }
 
-	static async enforceAppCreationRateLimit(
-		env: Env,
-		config: RateLimitSettings,
-		user: AuthUser,
-		request: Request
-	): Promise<void> {
-		if (!config[RateLimitType.APP_CREATION].enabled) {
-			return;
-		}
-		const identifier = await this.getUserIdentifier(user);
-
-		const key = this.buildRateLimitKey(RateLimitType.APP_CREATION, identifier);
-		
-		try {
-            const success = await this.enforce(env, key, config, RateLimitType.APP_CREATION);
-			if (!success) {
-				this.logger.warn('App creation rate limit exceeded', {
-					identifier,
-					key,
-					userAgent: request.headers.get('User-Agent'),
-					ip: request.headers.get('CF-Connecting-IP')
-				});
-				captureSecurityEvent('rate_limit_exceeded', {
-					limitType: RateLimitType.APP_CREATION,
-					identifier,
-					key,
-					userAgent: request.headers.get('User-Agent') || undefined,
-					ip: request.headers.get('CF-Connecting-IP') || undefined,
-				});
-				throw new RateLimitExceededError(
-					`App creation rate limit exceeded. Maximum ${config.appCreation.limit} apps per ${config.appCreation.period / 3600} hour${config.appCreation.period >= 7200 ? 's' : ''}`,
-					RateLimitType.APP_CREATION,
-					config.appCreation.limit,
-					config.appCreation.period,
-                    ['Please try again in an hour when the limit resets for you.']
-				);
-			}
-		} catch (error) {
-			if (error instanceof RateLimitExceededError || error instanceof SecurityError) {
-				throw error;
-			}
-			this.logger.error('Failed to enforce app creation rate limit', error);
-		}
-	}
-
-	static async enforceLLMCallsRateLimit(
+    static async enforceAppCreationRateLimit(
         env: Env,
-		config: RateLimitSettings,
-		user: AuthUser,
-	): Promise<void> {
-		
-		if (!config[RateLimitType.LLM_CALLS].enabled) {
-			return;
-		}
+        config: RateLimitSettings,
+        user: AuthUser,
+        request: Request
+    ): Promise<void> {
+        if (!config[RateLimitType.APP_CREATION].enabled) {
+            return;
+        }
+        const identifier = await this.getUserIdentifier(user);
 
-		const identifier = await this.getUserIdentifier(user);
-		
-		const key = this.buildRateLimitKey(RateLimitType.LLM_CALLS, identifier);
-		
-		try {
-			const success = await this.enforce(env, key, config, RateLimitType.LLM_CALLS);
-			if (!success) {
-				this.logger.warn('LLM calls rate limit exceeded', {
-					identifier,
-					key,
-                    config
-				});
-				captureSecurityEvent('rate_limit_exceeded', {
-					limitType: RateLimitType.LLM_CALLS,
-					identifier,
-					key,
-				});
-				throw new RateLimitExceededError(
-					`AI inference rate limit exceeded. Maximum ${config.llmCalls.limit} calls per ${config.llmCalls.period / 3600} hour${config.llmCalls.period >= 7200 ? 's' : ''}. Consider using your own API keys to remove this limit.`,
-					RateLimitType.LLM_CALLS,
-					config.llmCalls.limit,
-					config.llmCalls.period,
+        const key = this.buildRateLimitKey(RateLimitType.APP_CREATION, identifier);
+
+        try {
+            const success = await this.enforce(env, key, config, RateLimitType.APP_CREATION);
+            if (!success) {
+                this.logger.warn('App creation rate limit exceeded', {
+                    identifier,
+                    key,
+                    userAgent: request.headers.get('User-Agent'),
+                    ip: request.headers.get('CF-Connecting-IP')
+                });
+                captureSecurityEvent('rate_limit_exceeded', {
+                    limitType: RateLimitType.APP_CREATION,
+                    identifier,
+                    key,
+                    userAgent: request.headers.get('User-Agent') || undefined,
+                    ip: request.headers.get('CF-Connecting-IP') || undefined,
+                });
+                throw new RateLimitExceededError(
+                    `App creation rate limit exceeded. Maximum ${config.appCreation.limit} apps per ${config.appCreation.period / 3600} hour${config.appCreation.period >= 7200 ? 's' : ''}`,
+                    RateLimitType.APP_CREATION,
+                    config.appCreation.limit,
+                    config.appCreation.period,
                     ['Please try again in an hour when the limit resets for you.']
-				);
-			}
-		} catch (error) {
-			if (error instanceof RateLimitExceededError || error instanceof SecurityError) {
-				throw error;
-			}
-			this.logger.error('Failed to enforce LLM calls rate limit', error);
-		}
-	}
+                );
+            }
+        } catch (error) {
+            if (error instanceof RateLimitExceededError || error instanceof SecurityError) {
+                throw error;
+            }
+            this.logger.error('Failed to enforce app creation rate limit', error);
+        }
+    }
+
+    static async enforceLLMCallsRateLimit(
+        env: Env,
+        config: RateLimitSettings,
+        user: AuthUser,
+    ): Promise<void> {
+
+        if (!config[RateLimitType.LLM_CALLS].enabled) {
+            return;
+        }
+
+
+        if (!config[RateLimitType.LLM_CALLS].enabled) {
+            return;
+        }
+
+        const identifier = await this.getUserIdentifier(user);
+
+        const key = this.buildRateLimitKey(RateLimitType.LLM_CALLS, identifier);
+
+        try {
+            const success = await this.enforce(env, key, config, RateLimitType.LLM_CALLS);
+            if (!success) {
+                this.logger.warn('LLM calls rate limit exceeded', {
+                    identifier,
+                    key,
+                    config
+                });
+                captureSecurityEvent('rate_limit_exceeded', {
+                    limitType: RateLimitType.LLM_CALLS,
+                    identifier,
+                    key,
+                });
+                throw new RateLimitExceededError(
+                    `AI inference rate limit exceeded. Maximum ${config.llmCalls.limit} calls per ${config.llmCalls.period / 3600} hour${config.llmCalls.period >= 7200 ? 's' : ''}. Consider using your own API keys to remove this limit.`,
+                    RateLimitType.LLM_CALLS,
+                    config.llmCalls.limit,
+                    config.llmCalls.period,
+                    ['Please try again in an hour when the limit resets for you.']
+                );
+            }
+        } catch (error) {
+            if (error instanceof RateLimitExceededError || error instanceof SecurityError) {
+                throw error;
+            }
+            this.logger.error('Failed to enforce LLM calls rate limit', error);
+        }
+    }
 }
