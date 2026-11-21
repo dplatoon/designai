@@ -29,6 +29,7 @@ export interface AuthRequirement {
     required: boolean;
     level: 'public' | 'authenticated' | 'owner-only';
     resourceOwnershipCheck?: (user: AuthUser, params: Record<string, string>, env: Env) => Promise<boolean>;
+    requireVerified?: boolean;
 }
 
 /**
@@ -36,27 +37,37 @@ export interface AuthRequirement {
  */
 export const AuthConfig = {
     // Public route - no authentication required
-    public: { 
+    public: {
         required: false,
         level: 'public' as const
     },
-    
+
     // Require full authentication (no anonymous users)
-    authenticated: { 
-        required: true, 
-        level: 'authenticated' as const 
+    authenticated: {
+        required: true,
+        level: 'authenticated' as const,
+        requireVerified: true
     },
-    
+
+    // Require authentication but allow unverified users (useful for profile/verification pages)
+    authenticatedUnverified: {
+        required: true,
+        level: 'authenticated' as const,
+        requireVerified: false
+    },
+
     // Require resource ownership (for app editing)
-    ownerOnly: { 
-        required: true, 
+    ownerOnly: {
+        required: true,
         level: 'owner-only' as const,
-        resourceOwnershipCheck: checkAppOwnership
+        resourceOwnershipCheck: checkAppOwnership,
+        requireVerified: true
     },
-    
+
     // Public read access, but owner required for modifications
-    publicReadOwnerWrite: { 
-        required: false 
+    publicReadOwnerWrite: {
+        required: false,
+        level: 'public' as const
     }
 } as const;
 
@@ -69,54 +80,50 @@ export async function routeAuthChecks(
     requirement: AuthRequirement,
     params?: Record<string, string>
 ): Promise<{ success: boolean; response?: Response }> {
+    // console.log('requirement', requirement, 'for user', user);
     try {
-        // Public routes always pass
-        console.log('requirement', requirement, 'for user', user);
-        if (requirement.level === 'public') {
-            return { success: true };
-        }
 
-        // For authenticated routes
-        if (requirement.level === 'authenticated') {
+        // Authentication check for non-public routes
+        if (requirement.level !== 'public') {
             if (!user) {
                 return {
                     success: false,
-                    response: createAuthRequiredResponse()
+                    response: createAuthRequiredResponse(requirement.level === 'owner-only' ? 'Account required' : undefined)
                 };
             }
 
-            return { success: true };
+            // Email verification check (enabled by default for authenticated routes)
+            if (requirement.requireVerified !== false && !user.emailVerified) {
+                return {
+                    success: false,
+                    response: createVerificationRequiredResponse()
+                };
+            }
         }
 
-        // For owner-only routes
+        // Resource ownership check for owner-only routes
         if (requirement.level === 'owner-only') {
-            if (!user) {
-                return {
-                    success: false,
-                    response: createAuthRequiredResponse('Account required')
-                };
-            }
-
-            // Check resource ownership if function provided
+            // User is guaranteed to exist here
             if (requirement.resourceOwnershipCheck) {
                 if (params) {
-                    const isOwner = await requirement.resourceOwnershipCheck(user, params, env);
-                    return {
-                        success: isOwner,
-                        response: isOwner ? undefined : createForbiddenResponse('You can only access your own resources')
+                    const isOwner = await requirement.resourceOwnershipCheck(user!, params, env);
+                    if (!isOwner) {
+                        return {
+                            success: false,
+                            response: createForbiddenResponse('You can only access your own resources')
+                        };
                     }
+                } else {
+                    return {
+                        success: false,
+                        response: createForbiddenResponse('Invalid resource ownership parameters')
+                    };
                 }
-                return {
-                    success: false,
-                    response: createForbiddenResponse('Invalid resource ownership')
-                };
             }
-
-            return { success: true };
         }
 
-        // Default fallback
         return { success: true };
+
     } catch (error) {
         logger.error('Error in route auth middleware', error);
         return {
@@ -135,7 +142,7 @@ export async function routeAuthChecks(
 /*
  * Enforce authentication requirement
  */
-export async function enforceAuthRequirement(c: Context<AppEnv>) : Promise<Response | undefined> {
+export async function enforceAuthRequirement(c: Context<AppEnv>): Promise<Response | undefined> {
     let user: AuthUser | null = c.get('user') || null;
 
     const requirement = c.get('authLevel');
@@ -143,7 +150,7 @@ export async function enforceAuthRequirement(c: Context<AppEnv>) : Promise<Respo
         logger.error('No authentication level found');
         return errorResponse('No authentication level found', 500);
     }
-    
+
     // Only perform auth if we need it or don't have user yet
     if (!user && (requirement.level === 'authenticated' || requirement.level === 'owner-only')) {
         const userSession = await authMiddleware(c.req.raw, c.env);
@@ -152,8 +159,8 @@ export async function enforceAuthRequirement(c: Context<AppEnv>) : Promise<Respo
         }
         user = userSession.user;
         c.set('user', user);
-		c.set('sessionId', userSession.sessionId);
-		Sentry.setUser({ id: user.id, email: user.email });
+        c.set('sessionId', userSession.sessionId);
+        Sentry.setUser({ id: user.id, email: user.email });
 
         const config = await getUserConfigurableSettings(c.env, user.id);
         c.set('config', config);
@@ -168,7 +175,7 @@ export async function enforceAuthRequirement(c: Context<AppEnv>) : Promise<Respo
             return errorResponse('Internal server error', 500);
         }
     }
-    
+
     const params = c.req.param();
     const env = c.env;
     const result = await routeAuthChecks(user, env, requirement, params);
@@ -202,6 +209,23 @@ function createAuthRequiredResponse(message?: string): Response {
             'Content-Type': 'application/json',
             'WWW-Authenticate': 'Bearer realm="API"'
         }
+    });
+}
+
+/**
+ * Create standardized verification required response
+ */
+function createVerificationRequiredResponse(): Response {
+    return new Response(JSON.stringify({
+        success: false,
+        error: {
+            type: 'VERIFICATION_REQUIRED',
+            message: 'Email verification required',
+            action: 'verify_email'
+        }
+    }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
     });
 }
 

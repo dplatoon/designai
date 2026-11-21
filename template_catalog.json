@@ -1,0 +1,51 @@
+[
+  {
+    "id": "c-code-react-runner",
+    "name": "c-code-react-runner",
+    "description": "React/Vite application with Cloudflare Workers integration",
+    "projectType": "app",
+    "base_reference": "vite-reference"
+  },
+  {
+    "id": "minimal-js",
+    "name": "minimal-js",
+    "description": "Beautiful vanilla HTML, CSS, and JavaScript template with modern UI design. No frameworks - just clean, hand-crafted code for stunning web apps.",
+    "projectType": "app",
+    "base_reference": "minimal-js-reference"
+  },
+  {
+    "id": "reveal-presentation-pro",
+    "name": "reveal-presentation-pro",
+    "description": "Advanced Reveal.js presentation template with glass morphism design, runtime JSX compilation, and comprehensive slide components",
+    "projectType": "presentation",
+    "base_reference": "minimal-js-reference"
+  },
+  {
+    "id": "vite-cf-DO-KV-runner",
+    "name": "vite-cf-DO-KV-runner",
+    "description": "Vite/React application with Cloudflare Durable Objects and KV storage",
+    "projectType": "app",
+    "base_reference": "vite-reference"
+  },
+  {
+    "id": "vite-cf-DO-runner",
+    "name": "vite-cf-DO-runner",
+    "description": "Vite/React application with Cloudflare Durable Objects",
+    "projectType": "app",
+    "base_reference": "vite-reference"
+  },
+  {
+    "id": "vite-cf-DO-v2-runner",
+    "name": "vite-cf-DO-v2-runner",
+    "description": "Vite/React application with Cloudflare Durable Objects v2",
+    "projectType": "app",
+    "base_reference": "vite-reference"
+  },
+  {
+    "id": "vite-cfagents-runner",
+    "name": "vite-cfagents-runner",
+    "description": "Vite/React application with Cloudflare Agents SDK and MCP support",
+    "projectType": "app",
+    "base_reference": "vite-reference"
+  }
+]

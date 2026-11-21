@@ -366,14 +366,14 @@ class ApiClient {
                             break;
                         case SecurityErrorType.RATE_LIMITED:
                             // Handle rate limiting
-                            console.log('Rate limited', errorData);
+
                             throw RateLimitExceededError.fromRateLimitError(errorData as unknown as RateLimitError);
                         default:
                             // Security error
                             throw new SecurityError(errorData.type, errorData.message);
                         }
                     }
-                    console.log("Came here");
+
 
                     throw new ApiError(
                         response.status,

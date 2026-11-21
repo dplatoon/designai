@@ -1,5 +1,5 @@
 import { createSystemMessage, createUserMessage, createMultiModalUserMessage } from '../inferutils/common';
-import { TemplateListResponse} from '../../services/sandbox/sandboxTypes';
+import { TemplateListResponse } from '../../services/sandbox/sandboxTypes';
 import { createLogger } from '../../logger';
 import { executeInference } from '../inferutils/infer';
 import { InferenceContext } from '../inferutils/config.types';
@@ -27,12 +27,12 @@ export async function selectTemplate({ env, query, availableTemplates, inference
     }
 
     try {
-        logger.info("Asking AI to select a template", { 
-            query, 
+        logger.info("Asking AI to select a template", {
+            query,
             queryLength: query.length,
             imagesCount: images?.length || 0,
             availableTemplates: availableTemplates.map(t => t.name),
-            templateCount: availableTemplates.length 
+            templateCount: availableTemplates.length
         });
 
         const templateDescriptions = availableTemplates.map((t, index) =>
@@ -105,7 +105,7 @@ ENTROPY SEED: ${generateSecureToken(64)} - for unique results`;
                 userPrompt,
                 images.map(img => `data:${img.mimeType};base64,${img.base64Data}`),
                 'high'
-              )
+            )
             : createUserMessage(userPrompt);
 
         const messages = [
@@ -113,7 +113,7 @@ ENTROPY SEED: ${generateSecureToken(64)} - for unique results`;
             userMessage
         ];
 
-        const { object: selection } = await executeInference({
+        const response = await executeInference({
             env,
             messages,
             agentActionName: "templateSelection",
@@ -121,6 +121,12 @@ ENTROPY SEED: ${generateSecureToken(64)} - for unique results`;
             context: inferenceContext,
             maxTokens: 2000,
         });
+
+        if (!response || !('object' in response)) {
+            throw new Error("Failed to select a template using AI after multiple retries. Check AI provider health and API keys.");
+        }
+
+        const { object: selection } = response;
 
 
         logger.info(`AI template selection result: ${selection.selectedTemplateName || 'None'}, Reasoning: ${selection.reasoning}`);

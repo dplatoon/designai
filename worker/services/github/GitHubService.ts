@@ -39,9 +39,9 @@ type GitHubTree = NonNullable<RestEndpointMethodTypes['git']['createTree']['para
 
 export class GitHubService {
     private static readonly logger = createLogger('GitHubService');
-    private static readonly DEFAULT_BOT_NAME = 'vibesdk-bot';
-    private static readonly DEFAULT_BOT_EMAIL = 'noreply@vibesdk.com';
-    private static readonly README_CONTENT = '# Generated App\n\nGenerated with vibesdk';
+    private static readonly DEFAULT_BOT_NAME = 'designai-bot';
+    private static readonly DEFAULT_BOT_EMAIL = 'noreply@designai.dev';
+    private static readonly README_CONTENT = '# Generated App\n\nGenerated with DesignAI';
 
     private static createAuthorInfo(request: GitHubPushRequest, timestamp?: string) {
         return {
@@ -55,7 +55,7 @@ export class GitHubService {
         const headers: Record<string, string> = {
             Authorization: `token ${token}`,
             Accept: 'application/vnd.github.v3+json',
-            'User-Agent': 'vibesdk/1.0',
+            'User-Agent': 'designai/1.0',
         };
 
         if (includeContentType) {

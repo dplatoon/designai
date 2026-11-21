@@ -101,7 +101,7 @@ export interface BaseAppQueryOptions extends PaginationParams {
  * User app query options with user-specific filters
  */
 export interface AppQueryOptions extends BaseAppQueryOptions {
-    status?: 'generating' | 'completed';
+    status?: 'generating' | 'completed' | 'failed';
     visibility?: Visibility;
 }
 
@@ -218,7 +218,7 @@ export interface AppStats {
 /**
  * Raw Secret data for storage (before encryption)  
  */
-export interface SecretData extends Omit<schema.UserSecret, 'encryptedValue' | 'id' | 'isActive' | 'createdAt' | 'updatedAt' | 'lastUsed' | 'userId' | 'usageCount' | 'keyPreview' > {
+export interface SecretData extends Omit<schema.UserSecret, 'encryptedValue' | 'id' | 'isActive' | 'createdAt' | 'updatedAt' | 'lastUsed' | 'userId' | 'usageCount' | 'keyPreview'> {
     value: string;
 }
 /**

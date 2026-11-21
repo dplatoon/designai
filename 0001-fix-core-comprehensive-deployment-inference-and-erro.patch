@@ -1,0 +1,2728 @@
+From 43ea2d8ee92f9a44b8d9f4ee33047da7ce8518c4 Mon Sep 17 00:00:00 2001
+From: Digital platoon <wordtoimageai@gmail.com>
+Date: Thu, 5 Mar 2026 08:58:01 +0600
+Subject: [PATCH] fix(core): comprehensive deployment, inference, and error
+ handling updates
+
+---
+ diagnose.ps1                           |   88 ++
+ diagnose.sh                            |   76 ++
+ logs.json                              | 1041 ++++++++++++++++++++++++
+ package.json                           |    4 +-
+ scripts/deploy.ts                      |   22 +-
+ test-d1.ts                             |   22 +
+ worker-configuration.d.ts              |    1 +
+ worker/agents/inferutils/core.ts       |  171 ++--
+ worker/agents/operations/CodeReview.ts |  275 +++----
+ worker/agents/prompts.ts               |   68 +-
+ worker/api/honoAdapter.ts              |   21 +-
+ worker/api/routes/codegenRoutes.ts     |    9 +-
+ worker/api/routes/index.ts             |    1 +
+ worker/app.ts                          |   35 +-
+ worker/index.ts                        |  222 +++--
+ wrangler.jsonc                         |   34 +-
+ 16 files changed, 1721 insertions(+), 369 deletions(-)
+ create mode 100644 diagnose.ps1
+ create mode 100644 diagnose.sh
+ create mode 100644 logs.json
+ create mode 100644 test-d1.ts
+
+diff --git a/diagnose.ps1 b/diagnose.ps1
+new file mode 100644
+index 0000000..072ba25
+--- /dev/null
++++ b/diagnose.ps1
+@@ -0,0 +1,88 @@
++# DesignAI.dev Diagnostic PowerShell Script
++# This script checks the local environment and project structure.
++
++Write-Host "🔍 Running DesignAI Diagnostics..." -ForegroundColor Cyan
++
++# 1. Check for required files
++Write-Host -NoNewline "Checking for wrangler.jsonc... "
++if (Test-Path "wrangler.jsonc") {
++    Write-Host "✅" -ForegroundColor Green
++}
++else {
++    Write-Host "❌ NOT FOUND" -ForegroundColor Red
++}
++
++Write-Host -NoNewline "Checking for package.json... "
++if (Test-Path "package.json") {
++    Write-Host "✅" -ForegroundColor Green
++}
++else {
++    Write-Host "❌ NOT FOUND" -ForegroundColor Red
++}
++
++Write-Host -NoNewline "Checking for .prod.vars... "
++if (Test-Path ".prod.vars") {
++    Write-Host "✅" -ForegroundColor Green
++}
++else {
++    Write-Host "❌ NOT FOUND (Optional but recommended for deployment)" -ForegroundColor Yellow
++}
++
++# 2. Check for build artifacts
++Write-Host -NoNewline "Checking for dist directory... "
++if (Test-Path "dist") {
++    Write-Host "✅" -ForegroundColor Green
++    Write-Host -NoNewline "  Checking for dist/client/index.html... "
++    if (Test-Path "dist/client/index.html") {
++        Write-Host "✅" -ForegroundColor Green
++    }
++    else {
++        Write-Host "❌ NOT FOUND" -ForegroundColor Red
++    }
++}
++else {
++    Write-Host "❌ NOT FOUND (Run 'bun run build' first)" -ForegroundColor Red
++}
++
++# 3. Check wrangler configuration
++Write-Host -NoNewline "Checking wrangler.jsonc assets configuration... "
++$content = [System.IO.File]::ReadAllText("wrangler.jsonc")
++if ($content -match '"directory":\s*"([^"]+)"') {
++    $assetsDir = $Matches[1]
++    if ($assetsDir -eq "dist/client") {
++        Write-Host "✅ (Points to $assetsDir)" -ForegroundColor Green
++    }
++    else {
++        Write-Host "⚠️  Currently points to '$assetsDir'. Should likely be 'dist/client'." -ForegroundColor Yellow
++    }
++}
++else {
++    Write-Host "❌ Could not find assets directory configuration" -ForegroundColor Red
++}
++
++# 4. Check for node_modules
++Write-Host -NoNewline "Checking for node_modules... "
++if (Test-Path "node_modules") {
++    Write-Host "✅" -ForegroundColor Green
++}
++else {
++    Write-Host "❌ NOT FOUND (Run 'bun install')" -ForegroundColor Red
++}
++
++# 5. Check for Bun
++Write-Host -NoNewline "Checking for bun... "
++try {
++    $bunVersion = (& bun --version)
++    Write-Host "✅ Version: $bunVersion" -ForegroundColor Green
++}
++catch {
++    Write-Host "❌ NOT FOUND" -ForegroundColor Red
++}
++
++Write-Host "-----------------------------------" -ForegroundColor Blue
++Write-Host "Common Fixes:"
++Write-Host "1. If site is blank: Ensure 'assets.directory' in wrangler.jsonc is 'dist/client'"
++Write-Host "2. If build fails: Run 'bun install' then 'bun run build'"
++Write-Host "3. If deployment fails: Check CLOUDFLARE_API_TOKEN in .prod.vars"
++Write-Host "-----------------------------------" -ForegroundColor Blue
++Write-Host "Diagnostic Complete." -ForegroundColor Cyan
+diff --git a/diagnose.sh b/diagnose.sh
+new file mode 100644
+index 0000000..1edcca9
+--- /dev/null
++++ b/diagnose.sh
+@@ -0,0 +1,76 @@
++#!/bin/bash
++
++# DesignAI.dev Diagnostic Script
++# This script checks the local environment and project structure.
++
++echo "🔍 Running DesignAI Diagnostics..."
++
++# 1. Check for required files
++echo -n "Checking for wrangler.jsonc... "
++if [ -f "wrangler.jsonc" ]; then
++    echo "✅"
++else
++    echo "❌ NOT FOUND"
++fi
++
++echo -n "Checking for package.json... "
++if [ -f "package.json" ]; then
++    echo "✅"
++else
++    echo "❌ NOT FOUND"
++fi
++
++echo -n "Checking for .prod.vars... "
++if [ -f ".prod.vars" ]; then
++    echo "✅"
++else
++    echo "❌ NOT FOUND (Optional but recommended for deployment)"
++fi
++
++# 2. Check for build artifacts
++echo -n "Checking for dist directory... "
++if [ -d "dist" ]; then
++    echo "✅"
++    echo -n "  Checking for dist/client/index.html... "
++    if [ -f "dist/client/index.html" ]; then
++        echo "✅"
++    else
++        echo "❌ NOT FOUND"
++    fi
++else
++    echo "❌ NOT FOUND (Run 'bun run build' first)"
++fi
++
++# 3. Check wrangler configuration
++echo -n "Checking wrangler.jsonc assets configuration... "
++ASSETS_DIR=$(grep -oP '"directory":\s*"\K[^"]+' wrangler.jsonc)
++if [ "$ASSETS_DIR" == "dist/client" ]; then
++    echo "✅ (Points to $ASSETS_DIR)"
++else
++    echo "⚠️  Currently points to '$ASSETS_DIR'. Should likely be 'dist/client'."
++fi
++
++# 4. Check for node_modules
++echo -n "Checking for node_modules... "
++if [ -d "node_modules" ]; then
++    echo "✅"
++else
++    echo "❌ NOT FOUND (Run 'bun install')"
++fi
++
++# 5. Check for Bun
++echo -n "Checking for bun... "
++if command -v bun &> /dev/null; then
++    bun --version | xargs echo -n "✅ Version: "
++    echo ""
++else
++    echo "❌ NOT FOUND"
++fi
++
++echo "-----------------------------------"
++echo "Common Fixes:"
++echo "1. If site is blank: Ensure 'assets.directory' in wrangler.jsonc is 'dist/client'"
++echo "2. If build fails: Run 'bun install' then 'bun run build'"
++echo "3. If deployment fails: Check CLOUDFLARE_API_TOKEN in .prod.vars"
++echo "-----------------------------------"
++echo "Diagnostic Complete."
+diff --git a/logs.json b/logs.json
+new file mode 100644
+index 0000000..84d460a
+--- /dev/null
++++ b/logs.json
+@@ -0,0 +1,1041 @@
++{
++    "wallTime": 23,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/ui-radix-De7ADfHK.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499445
++        }
++    ],
++    "eventTimestamp": 1772667499138,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/ui-radix-De7ADfHK.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd9f3dba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"d7ae45104251be42e023ccb87ed81674\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 21,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/utils-Uicf-ujK.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499443
++        }
++    ],
++    "eventTimestamp": 1772667499139,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/utils-Uicf-ujK.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd8f37ba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"8fe6a4ed8f45c35ddca1032d7a787fbf\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 24,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/animation-CXGQgKhK.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499444
++        }
++    ],
++    "eventTimestamp": 1772667499140,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/animation-CXGQgKhK.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd8f38ba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"186423f1200745b3ae5848e8f87115b4\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 12,
++    "cpuTime": 1,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/index-DM-EYgOT.css"
++            ],
++            "level": "log",
++            "timestamp": 1772667499760
++        }
++    ],
++    "eventTimestamp": 1772667499140,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/index-DM-EYgOT.css",
++            "method": "GET",
++            "headers": {
++                "accept": "text/css,*/*;q=0.1",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd8f36ba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"c0037a7b47e59db5c4195d6d03a76c1f\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=0",
++                "referer": "https://designai.hasantawhid2096.workers.dev/chat/new?query=Create%20a%20Todo%20list%20app&agentMode=deterministic",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "style",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 22,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/parser-md-BSiglo2N.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499444
++        }
++    ],
++    "eventTimestamp": 1772667499141,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/parser-md-BSiglo2N.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd9f3cba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"fc69b3b2d3cb4183aa28965f33f06b4b\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 37,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/monaco-BPK6MzUf.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499443
++        }
++    ],
++    "eventTimestamp": 1772667499142,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/monaco-BPK6MzUf.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd8f3aba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"fb381a84abba048868ea071fabf34c5b\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 24,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/rolldown-runtime-DDUpfMIz.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499444
++        }
++    ],
++    "eventTimestamp": 1772667499141,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/rolldown-runtime-DDUpfMIz.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd9f3bba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"5f128f4cbb060f31ee2d29d5a6533978\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 20,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/react-core-AOUYQn_P.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499443
++        }
++    ],
++    "eventTimestamp": 1772667499139,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/react-core-AOUYQn_P.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd8f39ba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"bcff4b7095ba49112abbb4c4ba068843\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 21,
++    "cpuTime": 0,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/ui-icons-BROgTjX-.js"
++            ],
++            "level": "log",
++            "timestamp": 1772667499444
++        }
++    ],
++    "eventTimestamp": 1772667499153,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/ui-icons-BROgTjX-.js",
++            "method": "GET",
++            "headers": {
++                "accept": "*/*",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd8f35ba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"ea81c9806423f1ff1f8c6d3f31f48c99\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=1",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "script",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "requestHeaderNames": {},
++                "httpProtocol": "HTTP/3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "continent": "AS",
++                "asn": 134113,
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "verifiedBotCategory": "",
++                "country": "BD",
++                "isEUCountry": false,
++                "region": "Mymensingh Division",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientAuth": {
++                    "certIssuerDNLegacy": "",
++                    "certIssuerSKI": "",
++                    "certSubjectDNRFC2253": "",
++                    "certSubjectDNLegacy": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certSKI": "",
++                    "certSerial": "",
++                    "certIssuerDN": "",
++                    "certVerified": "NONE",
++                    "certNotAfter": "",
++                    "certSubjectDN": "",
++                    "certPresented": "0",
++                    "certRevoked": "0",
++                    "certIssuerSerial": "",
++                    "certIssuerDNRFC2253": "",
++                    "certFingerprintSHA1": ""
++                },
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientHelloLength": "1760",
++                "colo": "DAC",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestPriority": "",
++                "postalCode": "2210",
++                "city": "Mymensingh",
++                "tlsVersion": "TLSv1.3",
++                "regionCode": "H",
++                "asOrganization": "Millennium Computers & Networking",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY="
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
++{
++    "wallTime": 18,
++    "cpuTime": 1,
++    "truncated": false,
++    "executionModel": "stateless",
++    "outcome": "ok",
++    "scriptVersion": {
++        "id": "1764d50b-f21e-45cb-8d3c-eedd3e9ea047"
++    },
++    "scriptName": "designai",
++    "diagnosticsChannelEvents": [],
++    "exceptions": [],
++    "logs": [
++        {
++            "message": [
++                "Received request: GET https://designai.hasantawhid2096.workers.dev/assets/monaco-B9WiNxkw.css"
++            ],
++            "level": "log",
++            "timestamp": 1772667499441
++        }
++    ],
++    "eventTimestamp": 1772667499137,
++    "event": {
++        "request": {
++            "url": "https://designai.hasantawhid2096.workers.dev/assets/monaco-B9WiNxkw.css",
++            "method": "GET",
++            "headers": {
++                "accept": "text/css,*/*;q=0.1",
++                "accept-encoding": "gzip, br",
++                "accept-language": "en-US,en;q=0.9",
++                "cf-connecting-ip": "103.52.135.166",
++                "cf-ipcountry": "BD",
++                "cf-ray": "9d74b6bd8f34ba4d",
++                "cf-visitor": "{\"scheme\":\"https\"}",
++                "connection": "Keep-Alive",
++                "cookie": "REDACTED",
++                "host": "designai.hasantawhid2096.workers.dev",
++                "if-none-match": "W/\"3a4425575b4c8bf5434843c9e0ad9c6b\"",
++                "origin": "https://designai.hasantawhid2096.workers.dev",
++                "priority": "u=0",
++                "referer": "https://designai.hasantawhid2096.workers.dev/chat/new?query=Create%20a%20Todo%20list%20app&agentMode=deterministic",
++                "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"Microsoft Edge\";v=\"145\", \"Chromium\";v=\"145\"",
++                "sec-ch-ua-mobile": "?0",
++                "sec-ch-ua-platform": "\"Windows\"",
++                "sec-fetch-dest": "style",
++                "sec-fetch-mode": "cors",
++                "sec-fetch-site": "same-origin",
++                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
++                "x-forwarded-proto": "https",
++                "x-real-ip": "103.52.135.166"
++            },
++            "cf": {
++                "httpProtocol": "HTTP/3",
++                "clientAcceptEncoding": "gzip, deflate, br",
++                "requestPriority": "",
++                "edgeRequestKeepAliveStatus": 1,
++                "requestHeaderNames": {},
++                "clientTcpRtt": 0,
++                "colo": "DAC",
++                "asn": 134113,
++                "asOrganization": "Millennium Computers & Networking",
++                "country": "BD",
++                "isEUCountry": false,
++                "city": "Mymensingh",
++                "continent": "AS",
++                "region": "Mymensingh Division",
++                "regionCode": "H",
++                "timezone": "Asia/Dhaka",
++                "longitude": "90.40646",
++                "latitude": "24.75636",
++                "postalCode": "2210",
++                "tlsVersion": "TLSv1.3",
++                "tlsCipher": "AEAD-AES128-GCM-SHA256",
++                "tlsClientRandom": "bSl+N7IkFUSdqri7bUvJeOpuh1PDkO3hvxOVtaQaHVA=",
++                "tlsClientCiphersSha1": "3HTt3+R/6BL3zeALJDSq0pR1yOQ=",
++                "tlsClientExtensionsSha1": "bzi4rHKydr96I5F2aL1NyEDPCiY=",
++                "tlsClientExtensionsSha1Le": "",
++                "tlsClientHelloLength": "1760",
++                "tlsClientAuth": {
++                    "certPresented": "0",
++                    "certVerified": "NONE",
++                    "certRevoked": "0",
++                    "certIssuerDN": "",
++                    "certSubjectDN": "",
++                    "certIssuerDNRFC2253": "",
++                    "certSubjectDNRFC2253": "",
++                    "certIssuerDNLegacy": "",
++                    "certSubjectDNLegacy": "",
++                    "certSerial": "",
++                    "certIssuerSerial": "",
++                    "certSKI": "",
++                    "certIssuerSKI": "",
++                    "certFingerprintSHA1": "",
++                    "certFingerprintSHA256": "",
++                    "certNotBefore": "",
++                    "certNotAfter": ""
++                },
++                "verifiedBotCategory": ""
++            }
++        },
++        "response": {
++            "status": 304
++        }
++    }
++}
+diff --git a/package.json b/package.json
+index cb0c676..cf6b751 100644
+--- a/package.json
++++ b/package.json
+@@ -17,7 +17,7 @@
+ 		"db:generate": "drizzle-kit generate --config=drizzle.config.local.ts",
+ 		"db:generate:remote": "drizzle-kit generate --config=drizzle.config.remote.ts",
+ 		"db:migrate:local": "wrangler d1 migrations apply designai-db --local",
+-		"db:migrate:remote": "CI=true wrangler d1 migrations apply designai-db --remote",
++		"db:migrate:remote": "wrangler d1 migrations apply designai-db --remote",
+ 		"db:studio": "drizzle-kit studio --config=drizzle.config.local.ts",
+ 		"db:studio:remote": "drizzle-kit studio --config=drizzle.config.remote.ts",
+ 		"db:setup": "bun run scripts/setup-database.ts",
+@@ -159,4 +159,4 @@
+ 		"vite": "npm:rolldown-vite@latest",
+ 		"@cloudflare/containers": "^0.0.28"
+ 	}
+-}
++}
+\ No newline at end of file
+diff --git a/scripts/deploy.ts b/scripts/deploy.ts
+index 2fe460f..055b531 100644
+--- a/scripts/deploy.ts
++++ b/scripts/deploy.ts
+@@ -624,8 +624,14 @@ class CloudflareDeploymentManager {
+ 				return;
+ 			}
+ 
+-			// Make script executable
+-			execSync(`chmod +x "${deployScript}"`, { cwd: templatesDir });
++			// Make script executable - skip on Windows as chmod doesn't exist
++			if (process.platform !== 'win32') {
++				try {
++					execSync(`chmod +x "${deployScript}"`, { cwd: templatesDir });
++				} catch (chmodError) {
++					console.warn(`⚠️  Failed to make script executable: ${chmodError instanceof Error ? chmodError.message : String(chmodError)}`);
++				}
++			}
+ 
+ 			// Run deployment script with environment variables
+ 			console.log(
+@@ -640,7 +646,10 @@ class CloudflareDeploymentManager {
+ 				R2_BUCKET_NAME: templatesBucket.bucket_name,
+ 			};
+ 
+-			execSync('./deploy_templates.sh', {
++			// On Windows, use 'sh' or 'bash' to run the script if available
++			const deployCommand = process.platform === 'win32' ? `sh "${deployScript}"` : `./deploy_templates.sh`;
++
++			execSync(deployCommand, {
+ 				stdio: 'inherit',
+ 				cwd: templatesDir,
+ 				env: deployEnv,
+@@ -969,8 +978,8 @@ class CloudflareDeploymentManager {
+ 
+ 		// Only update workers_dev and preview_urls if not preserving existing flags
+ 		if (!preserveExistingFlags) {
+-			updatedContent = this.updateWranglerField(updatedContent, 'workers_dev', false);
+-			updatedContent = this.updateWranglerField(updatedContent, 'preview_urls', false);
++			updatedContent = this.updateWranglerField(updatedContent, 'workers_dev', true);
++			updatedContent = this.updateWranglerField(updatedContent, 'preview_urls', true);
+ 		}
+ 
+ 		return updatedContent;
+@@ -1896,11 +1905,12 @@ class CloudflareDeploymentManager {
+ 		console.log('Running database migrations...');
+ 		try {
+ 			await execSync(
+-				'bun run db:generate && bun run db:migrate:remote',
++				'npm run db:generate && npm run db:migrate:remote',
+ 				{
+ 					stdio: 'inherit',
+ 					cwd: PROJECT_ROOT,
+ 					encoding: 'utf8',
++					env: { ...process.env, CI: 'true' }
+ 				}
+ 			);
+ 		} catch (error) {
+diff --git a/test-d1.ts b/test-d1.ts
+new file mode 100644
+index 0000000..23c7afe
+--- /dev/null
++++ b/test-d1.ts
+@@ -0,0 +1,22 @@
++
++import Cloudflare from 'cloudflare';
++
++async function main() {
++    const cf = new Cloudflare({
++        apiToken: 'gXK7cF0ThlkwieUk2WnsEgkQqVRgeC9xl5j5Kt7T'
++    });
++
++    const accountId = '2bb601259da4fa047868dd53ec3a313b';
++
++    try {
++        console.log('Listing D1 databases...');
++        const databases = await cf.d1.database.list({
++            account_id: accountId
++        });
++        console.log('Databases:', JSON.stringify(databases, null, 2));
++    } catch (error) {
++        console.error('Error:', error);
++    }
++}
++
++main();
+diff --git a/worker-configuration.d.ts b/worker-configuration.d.ts
+index b9dcb90..8c4b999 100644
+--- a/worker-configuration.d.ts
++++ b/worker-configuration.d.ts
+@@ -31,6 +31,7 @@ declare namespace Cloudflare {
+ 		OPENROUTER_API_KEY: string;
+ 		GOOGLE_AI_STUDIO_API_KEY: string;
+ 		ANTHROPIC_API_KEY: string;
++		OPENAI_API_KEY: string;
+ 		SERPAPI_KEY: string;
+ 
+ 		// Sentry & Observability
+diff --git a/worker/agents/inferutils/core.ts b/worker/agents/inferutils/core.ts
+index 9e2fae5..cae5890 100644
+--- a/worker/agents/inferutils/core.ts
++++ b/worker/agents/inferutils/core.ts
+@@ -189,10 +189,10 @@ function optimizeTextContent(content: string): string {
+ 
+ export async function buildGatewayUrl(env: Env, providerOverride?: AIGatewayProviders): Promise<string> {
+     // If CLOUDFLARE_AI_GATEWAY_URL is set and is a valid URL, use it directly
+-    if (env.CLOUDFLARE_AI_GATEWAY_URL && 
+-        env.CLOUDFLARE_AI_GATEWAY_URL !== 'none' && 
++    if (env.CLOUDFLARE_AI_GATEWAY_URL &&
++        env.CLOUDFLARE_AI_GATEWAY_URL !== 'none' &&
+         env.CLOUDFLARE_AI_GATEWAY_URL.trim() !== '') {
+-        
++
+         try {
+             const url = new URL(env.CLOUDFLARE_AI_GATEWAY_URL);
+             // Validate it's actually an HTTP/HTTPS URL
+@@ -207,7 +207,7 @@ export async function buildGatewayUrl(env: Env, providerOverride?: AIGatewayProv
+             console.warn(`Invalid CLOUDFLARE_AI_GATEWAY_URL provided: ${env.CLOUDFLARE_AI_GATEWAY_URL}. Falling back to AI bindings.`);
+         }
+     }
+-    
++
+     // Build the url via bindings
+     const gateway = env.AI.gateway(env.CLOUDFLARE_AI_GATEWAY);
+     const baseUrl = providerOverride ? await gateway.getUrl(providerOverride) : `${await gateway.getUrl()}compat`;
+@@ -245,7 +245,7 @@ async function getApiKey(provider: string, env: Env, _userId: string): Promise<s
+     const providerKeyString = provider.toUpperCase().replaceAll('-', '_');
+     const envKey = `${providerKeyString}_API_KEY` as keyof Env;
+     let apiKey: string = env[envKey] as string;
+-    
++
+     // Check if apiKey is empty or undefined and is valid
+     if (!isValidApiKey(apiKey)) {
+         apiKey = env.CLOUDFLARE_AI_GATEWAY_TOKEN;
+@@ -254,8 +254,8 @@ async function getApiKey(provider: string, env: Env, _userId: string): Promise<s
+ }
+ 
+ export async function getConfigurationForModel(
+-    model: AIModels | string, 
+-    env: Env, 
++    model: AIModels | string,
++    env: Env,
+     userId: string,
+ ): Promise<{
+     baseURL: string,
+@@ -307,7 +307,7 @@ export async function getConfigurationForModel(
+ type InferArgsBase = {
+     env: Env;
+     metadata: InferenceMetadata;
+-    actionKey: AgentActionKey  | 'testModelConfig';
++    actionKey: AgentActionKey | 'testModelConfig';
+     messages: Message[];
+     maxTokens?: number;
+     modelName: AIModels | string;
+@@ -386,7 +386,7 @@ async function executeToolCalls(openAiToolCalls: ChatCompletionMessageFunctionTo
+                     name: tc.function.name,
+                     arguments: {},
+                     result: { error: `Failed to execute ${tc.function.name}: ${error instanceof Error ? error.message : 'Unknown error'}` }
+-            };
++                };
+             }
+         })
+     );
+@@ -438,7 +438,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+     if (messages.length > MAX_LLM_MESSAGES) {
+         throw new RateLimitExceededError(`Message limit exceeded: ${messages.length} messages (max: ${MAX_LLM_MESSAGES}). Please use context compactification.`, RateLimitType.LLM_CALLS);
+     }
+-    
++
+     // Check tool calling depth to prevent infinite recursion
+     const currentDepth = toolCallContext?.depth ?? 0;
+     if (currentDepth >= MAX_TOOL_CALLING_DEPTH) {
+@@ -447,12 +447,12 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+         if (schema) {
+             throw new Error(`Maximum tool calling depth (${MAX_TOOL_CALLING_DEPTH}) exceeded. Tools may be calling each other recursively.`);
+         }
+-        return { 
++        return {
+             string: `[System: Maximum tool calling depth reached.]`,
+-            toolCallContext 
++            toolCallContext
+         };
+     }
+-    
++
+     try {
+         const authUser: AuthUser = {
+             id: metadata.userId,
+@@ -472,19 +472,19 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+         // Remove [*.] from model name
+         modelName = modelName.replace(/\[.*?\]/, '');
+ 
+-        const client = new OpenAI({ apiKey, baseURL: baseURL, defaultHeaders });
+         const schemaObj =
+             schema && schemaName && !format
+                 ? { response_format: zodResponseFormat(schema, schemaName) }
+                 : {};
+-        const extraBody = modelName.includes('claude')? {
+-                    extra_body: {
+-                        thinking: {
+-                            type: 'enabled',
+-                            budget_tokens: claude_thinking_budget_tokens[reasoning_effort ?? 'medium'],
+-                        },
+-                    },
+-                }
++
++        const extraBody = (modelName.includes('claude') || modelName.includes('3.5-sonnet')) ? {
++            extra_body: {
++                thinking: {
++                    type: 'enabled',
++                    budget_tokens: claude_thinking_budget_tokens[reasoning_effort ?? 'medium'],
++                },
++            },
++        }
+             : {};
+ 
+         // Optimize messages to reduce token count
+@@ -542,35 +542,92 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+ 
+         const toolsOpts = tools ? { tools, tool_choice: 'auto' as const } : {};
+         let response: OpenAI.ChatCompletion | OpenAI.ChatCompletionChunk | Stream<OpenAI.ChatCompletionChunk>;
+-        try {
+-            // Call OpenAI API with proper structured output format
+-            response = await client.chat.completions.create({
+-                ...schemaObj,
+-                ...extraBody,
+-                ...toolsOpts,
+-                model: modelName,
+-                messages: messagesToPass as OpenAI.ChatCompletionMessageParam[],
+-                max_completion_tokens: maxTokens || 150000,
+-                stream: stream ? true : false,
+-                reasoning_effort,
+-                temperature,
+-            }, {
+-                headers: {
+-                    "cf-aig-metadata": JSON.stringify({
+-                        chatId: metadata.agentId,
+-                        userId: metadata.userId,
+-                        schemaName,
+-                        actionKey,
+-                    })
++
++        // Execute inference with retry logic and fallback
++        const maxRetries = 3;
++        let lastError: any = null;
++        let currentBaseURL = baseURL;
++        let currentApiKey = apiKey;
++        let isDirectFallback = false;
++
++        for (let attempt = 1; attempt <= maxRetries; attempt++) {
++            try {
++                const currentClient = new OpenAI({
++                    apiKey: currentApiKey,
++                    baseURL: currentBaseURL,
++                    defaultHeaders
++                });
++
++                // Call OpenAI API with proper structured output format
++                response = await currentClient.chat.completions.create({
++                    ...schemaObj,
++                    ...extraBody,
++                    ...toolsOpts,
++                    model: modelName,
++                    messages: messagesToPass as OpenAI.ChatCompletionMessageParam[],
++                    max_completion_tokens: maxTokens || 150000,
++                    stream: stream ? true : false,
++                    reasoning_effort,
++                    temperature,
++                }, {
++                    headers: {
++                        "cf-aig-metadata": JSON.stringify({
++                            chatId: metadata.agentId,
++                            userId: metadata.userId,
++                            schemaName,
++                            actionKey,
++                        })
++                    }
++                });
++
++                console.log(`Inference response received on attempt ${attempt}`);
++                break; // Success!
++
++            } catch (error: any) {
++                lastError = error;
++                console.error(`Attempt ${attempt} failed:`, error);
++
++                // Handle rate limits
++                if (error.status === 429) {
++                    console.warn('Rate limit exceeded (429), backing off...');
++                    if (attempt < maxRetries) {
++                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
++                        continue;
++                    }
+                 }
+-            });
+-            console.log(`Inference response received`);
+-        } catch (error) {
+-            console.error(`Failed to get inference response from OpenAI: ${error}`);
+-            if ((error instanceof Error && error.message.includes('429')) || (typeof error === 'string' && error.includes('429'))) {
+-                throw new RateLimitExceededError('Rate limit exceeded in LLM calls, Please try again later', RateLimitType.LLM_CALLS);
++
++                // If AI Gateway is failing (500, 404, or non-JSON response), attempt direct fallback for Gemini/Google or OpenAI models
++                if (!isDirectFallback) {
++                    if ((modelName.includes('gemini') || modelName.includes('google')) && env.GOOGLE_AI_STUDIO_API_KEY) {
++                        console.log('Attempting direct Gemini API fallback...');
++                        currentBaseURL = 'https://generativelanguage.googleapis.com/v1beta/openai/';
++                        currentApiKey = env.GOOGLE_AI_STUDIO_API_KEY;
++                        isDirectFallback = true;
++                        continue;
++                    } else if (modelName.includes('gpt-') && env.OPENAI_API_KEY) {
++                        console.log('Attempting direct OpenAI API fallback...');
++                        currentBaseURL = 'https://api.openai.com/v1/';
++                        currentApiKey = env.OPENAI_API_KEY;
++                        isDirectFallback = true;
++                        continue;
++                    }
++                }
++
++                if (attempt < maxRetries) {
++                    await new Promise(resolve => setTimeout(resolve, 500 * attempt));
++                    continue;
++                }
++
++                // If we reach here, we've exhausted retries
++                if (error.status === 429) {
++                    throw new RateLimitExceededError('Rate limit exceeded in LLM calls. Please try again later.', RateLimitType.LLM_CALLS);
++                }
++                throw error;
+             }
+-            throw error;
++        }
++
++        if (!response!) {
++            throw lastError || new Error('Failed to get response from AI model after multiple attempts');
+         }
+         let toolCalls: ChatCompletionMessageFunctionToolCall[] = [];
+ 
+@@ -583,16 +640,16 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+                 const byIndex = new Map<number, ToolAccumulatorEntry>();
+                 const byId = new Map<string, ToolAccumulatorEntry>();
+                 const orderCounterRef = { value: 0 };
+-                
++
+                 for await (const event of response) {
+                     const delta = (event as ChatCompletionChunk).choices[0]?.delta;
+-                    
++
+                     // Provider-specific logging
+                     const provider = modelName.split('/')[0];
+                     if (delta?.tool_calls && (provider === 'google-ai-studio' || provider === 'gemini')) {
+                         console.log(`[PROVIDER_DEBUG] ${provider} tool_calls delta:`, JSON.stringify(delta.tool_calls, null, 2));
+                     }
+-                    
++
+                     if (delta?.tool_calls) {
+                         try {
+                             for (const deltaToolCall of delta.tool_calls as ToolCallsArray) {
+@@ -602,7 +659,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+                             console.error('Error processing tool calls in streaming:', error);
+                         }
+                     }
+-                    
++
+                     // Process content
+                     content += delta?.content || '';
+                     const slice = content.slice(streamIndex);
+@@ -612,10 +669,10 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+                         streamIndex += slice.length;
+                     }
+                 }
+-                
++
+                 // Assemble toolCalls with preference for index ordering, else first-seen order
+                 toolCalls = assembleToolCalls(byIndex, byId);
+-                
++
+                 // Validate accumulated tool calls (do not mutate arguments)
+                 for (const toolCall of toolCalls) {
+                     if (!toolCall.function.name) {
+@@ -691,10 +748,10 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
+                 messages: newMessages,
+                 depth: newDepth
+             };
+-            
++
+             const executedCallsWithResults = executedToolCalls.filter(result => result.result);
+             console.log(`Tool calling depth: ${newDepth}/${MAX_TOOL_CALLING_DEPTH}`);
+-            
++
+             if (executedCallsWithResults.length) {
+                 if (schema && schemaName) {
+                     const output = await infer<OutputSchema>({
+diff --git a/worker/agents/operations/CodeReview.ts b/worker/agents/operations/CodeReview.ts
+index 2825fa4..b48db50 100644
+--- a/worker/agents/operations/CodeReview.ts
++++ b/worker/agents/operations/CodeReview.ts
+@@ -1,4 +1,4 @@
+-import { CodeReviewOutputType, CodeReviewOutput , FileOutputSchema } from '../schemas';
++import { CodeReviewOutputType, CodeReviewOutput, FileOutputSchema } from '../schemas';
+ import { GenerationContext } from '../domain/values/GenerationContext';
+ import { IssueReport } from '../domain/values/IssueReport';
+ import { createSystemMessage, createUserMessage } from '../inferutils/common';
+@@ -12,61 +12,12 @@ export interface CodeReviewInputs {
+     issues: IssueReport
+ }
+ 
+-const SYSTEM_PROMPT = `You are a Senior Software Engineer at Cloudflare specializing in comprehensive React application analysis. Your mandate is to identify ALL critical issues across the ENTIRE codebase that could impact functionality, user experience, or deployment.
+-
+-## COMPREHENSIVE ISSUE DETECTION PRIORITIES:
+-
+-### 1. REACT RENDER LOOPS & INFINITE LOOPS (CRITICAL)
+-**IMMEDIATELY FLAG THESE PATTERNS:**
+-- "Maximum update depth exceeded" errors
+-- "Too many re-renders" warnings  
+-- useEffect without dependency arrays that set state
+-- State updates during render phase
+-- Unstable object/array dependencies in hooks
+-- Infinite loops in event handlers or calculations
+-
+-### 2. RUNTIME ERRORS & CRASHES (CRITICAL)
+-- Undefined/null variable access without proper guards
+-- Import/export mismatches and missing imports
+-- TypeScript compilation errors
+-- Missing error boundaries around components
+-- Unhandled promise rejections
+-
+-### 3. LOGIC ERRORS & BROKEN FUNCTIONALITY (HIGH)
+-- Incorrect business logic implementation
+-- Wrong conditional statements or boolean logic
+-- Incorrect data transformations or calculations
+-- State management bugs (stale closures, race conditions)
+-- Event handlers not working as expected
+-- Form validation logic errors
+-
+-### 4. UI RENDERING & LAYOUT ISSUES (HIGH)
+-- Components not displaying correctly
+-- CSS layout problems (flexbox, grid issues)
+-- Responsive design breaking at certain breakpoints
+-- Missing or incorrect styling classes
+-- Accessibility violations (missing alt text, ARIA labels)
+-- Loading states and error states not implemented
+-
+-### 5. DATA FLOW & STATE MANAGEMENT (MEDIUM-HIGH)
+-- Props drilling where context should be used
+-- Incorrect state updates (mutating state directly)
+-- Missing state synchronization between components
+-- Inefficient re-renders due to poor state structure
+-- Missing loading/error states for async operations
+-
+-### 6. INCOMPLETE FEATURES & MISSING FUNCTIONALITY (MEDIUM)
+-- Placeholder components that need implementation
+-- TODO comments indicating missing functionality
+-- Incomplete API integrations
+-- Missing validation or error handling
+-- Unfinished user flows or navigation
+-
+-### 7. STALE ERROR FILTERING
+-**IGNORE these if no current evidence in codebase:**
+-- Errors mentioning files that don't exist in current code
+-- Errors about components/functions that have been removed
+-- Errors with timestamps older than recent changes
++const BASE_SYSTEM_PROMPT = `You are a Senior Software Engineer at Cloudflare specializing in comprehensive React application analysis. Your mandate is to identify ALL critical issues across the ENTIRE codebase.
++
++## ANALYSIS FOCUS: {{perspective}}
++
++### KEY PRIORITIES:
++{{priorities}}
+ 
+ ## COMPREHENSIVE ANALYSIS METHOD:
+ 1. **Scan ENTIRE codebase systematically** - don't just focus on reported errors
+@@ -90,15 +41,54 @@ ${PROMPT_UTILS.REACT_RENDER_LOOP_PREVENTION}
+ <DEPENDENCIES>
+ These are the dependencies that came installed in the environment:
+ {{dependencies}}
+-
+-If anything else is used in the project, make sure it is installed in the environment
+ </DEPENDENCIES>
+ 
+ {{template}}`;
+ 
+-// Open question: Do we need to pass blueprint to code reviewer?
++const PERSPECTIVES = [
++    {
++        name: 'Functionality & Logic',
++        priorities: `
++- REACT RENDER LOOPS & INFINITE LOOPS (CRITICAL)
++- RUNTIME ERRORS & CRASHES (CRITICAL)
++- LOGIC ERRORS & BROKEN FUNCTIONALITY (HIGH)
++- DATA FLOW & STATE MANAGEMENT (MEDIUM-HIGH)
++        `
++    },
++    {
++        name: 'UI/UX & Accessibility',
++        priorities: `
++- UI RENDERING & LAYOUT ISSUES (HIGH)
++- RESPONSIVE DESIGN & ADAPTIVE LAYOUTS (HIGH)
++- ACCESSIBILITY (A11Y) COMPLIANCE (MEDIUM)
++- CONSISTENT DESIGN SYSTEM USAGE (MEDIUM)
++        `
++    },
++    {
++        name: 'Performance & Security',
++        priorities: `
++- UNNECESSARY RE-RENDERS (MEDIUM)
++- BUNDLE SIZE & DEP LOADING (LOW)
++- INPUT VALIDATION & SECURITY (HIGH)
++- PROPER ERROR BOUNDARIES (MEDIUM)
++        `
++    }
++];
++
++const SYNTHESIS_SYSTEM_PROMPT = `You are a Lead Software Architect. You will receive multiple code reviews from different specialized perspectives (Functionality, UI/UX, Performance).
++Your task is to synthesize these reviews into a single, cohesive, and prioritized master review.
++
++## SYNTHESIS RULES:
++1. **De-duplicate issues**: If the same issue is mentioned in multiple reviews, consolidate it.
++2. **Prioritize effectively**: Critical issues (crashes, render loops) MUST come first.
++3. **Resolve conflicts**: If reviews suggest conflicting fixes, use your expert judgment to choose the best approach.
++4. **Preserve specific fixes**: Ensure the actionable file-specific fixes are preserved and clear.
++5. **Structure by file**: The final output MUST be structured by file path to enable parallel fixes.
+ 
+-const USER_PROMPT = `
++${PROMPT_UTILS.COMMANDS}
++{{template}}`;
++
++const USER_PROMPT_TEMPLATE = `
+ <REPORTED_ISSUES>
+ {{issues}}
+ </REPORTED_ISSUES>
+@@ -108,72 +98,10 @@ const USER_PROMPT = `
+ </CURRENT_CODEBASE>
+ 
+ <ANALYSIS_INSTRUCTIONS>
+-**Step 1: Filter Stale Errors**
+-- Compare reported errors against current codebase
+-- SKIP errors mentioning files/components that no longer exist
+-- SKIP errors that don't match current code structure
+-
+-**Step 2: Prioritize React Render Loops**
+-- Search for "Maximum update depth exceeded" patterns
+-- Look for useEffect without dependencies that modify state
+-- Identify unstable object/array references in hooks
+-- Flag setState calls during render phase
+-
+-**Step 3: Comprehensive Codebase Analysis**
+-- Scan each file for logic errors and broken functionality
+-- Check UI components for rendering and layout issues
+-- Validate state management patterns and data flow
+-- Identify incomplete features and missing implementations
+-- Review error handling and loading states
+-
+-**Step 4: Business Logic Validation**
+-- Verify conditional logic and calculations are correct
+-- Check form validation and user input handling
+-- Ensure API calls and data transformations work properly
+-- Validate user flows and navigation patterns
+-
+-**Step 5: UI/UX Issue Detection**
+-- Check for broken layouts and styling issues
+-- Identify missing responsive design implementations
+-- Find accessibility violations and missing states
+-- Validate component props and data binding
+-
+-**Step 6: Provide Parallel-Ready File Fixes**
+-IMPORTANT: Your output will be used to run PARALLEL FileRegeneration operations - one per file. Structure your findings accordingly:
+-
+-- **Group issues by file path** - each file will be fixed independently
+-- **Make each file's issues self-contained** - don't reference other files in the fix
+-- **Avoid cross-file dependencies** in fixes - each file must be fixable in isolation
+-- **Provide complete context per file** - include all necessary details for that file
+-
+-For each file with issues, provide:
+-- **FILE:** [exact file path]
+-- **ISSUES:** [List of specific issues in this file only]
+-- **PRIORITY:** Critical/High/Medium (for this file)
+-- **FIX_SCOPE:** [What needs to be changed in this specific file]
+-
+-**PARALLEL OPERATION CONSTRAINTS:**
+-- Each file will be processed by a separate FileRegeneration agent
+-- Agents cannot communicate with each other during fixes
+-- All issues for a file must be fixable without knowing other files' changes
+-- Avoid fixes that require coordinated changes across multiple files
+-- If a cross-file issue exists, break it down into independent file-specific fixes
+-
+-**ANALYSIS SCOPE:**
+-- Analyze ALL files in the codebase systematically
+-- Group discovered issues by the file they occur in
+-- Ensure each file's issues are complete and self-contained
+-- Prioritize issues that can be fixed independently
+-- Flag any issues requiring coordinated multi-file changes separately
++Perform a deep-dive analysis focusing specifically on **{{perspective_name}}**.
++Identify all issues, prioritize them, and provide self-contained fixes for each affected file.
+ </ANALYSIS_INSTRUCTIONS>`;
+ 
+-const userPromptFormatter = (issues: IssueReport, context: string) => {
+-    const prompt = USER_PROMPT
+-        .replaceAll('{{issues}}', issuesPromptFormatter(issues))
+-        .replaceAll('{{context}}', context);
+-    return PROMPT_UTILS.verifyPrompt(prompt);
+-}
+-
+ export class CodeReviewOperation extends AgentOperation<CodeReviewInputs, CodeReviewOutputType> {
+     async execute(
+         inputs: CodeReviewInputs,
+@@ -181,53 +109,100 @@ export class CodeReviewOperation extends AgentOperation<CodeReviewInputs, CodeRe
+     ): Promise<CodeReviewOutputType> {
+         const { issues } = inputs;
+         const { env, logger, context } = options;
+-        
+-        logger.info("Performing code review");
+-        logger.info("Running static code analysis via linting...");
+ 
+-        // Log all types of issues for comprehensive analysis
+-        if (issues.runtimeErrors.length > 0) {
+-            logger.info(`Found ${issues.runtimeErrors.length} runtime errors: ${issues.runtimeErrors.map(e => e.message).join(', ')}`);
+-        }
+-        if (issues.staticAnalysis.lint.issues.length > 0) {
+-            logger.info(`Found ${issues.staticAnalysis.lint.issues.length} lint issues`);
+-        }
+-        if (issues.staticAnalysis.typecheck.issues.length > 0) {
+-            logger.info(`Found ${issues.staticAnalysis.typecheck.issues.length} typecheck issues`);
+-        }
+-        
+-        logger.info("Performing comprehensive codebase analysis for all issue types (runtime, logic, UI, state management, incomplete features)");
++        logger.info("Performing comprehensive multi-perspective code review");
+ 
+         // Get files context
+         const filesContext = getFilesContext(context);
++        const issuesText = issuesPromptFormatter(issues);
++
++        // 1. Run specialized reviews in parallel
++        logger.info(`Launching ${PERSPECTIVES.length} specialized review agents...`);
+ 
+-        const messages = [
+-            createSystemMessage(generalSystemPromptBuilder(SYSTEM_PROMPT, {
++        const perspectivePromises = PERSPECTIVES.map(async (perspective) => {
++            const systemPrompt = generalSystemPromptBuilder(BASE_SYSTEM_PROMPT, {
++                query: context.query,
++                blueprint: context.blueprint,
++                templateDetails: context.templateDetails,
++                dependencies: context.dependencies,
++                extraVariables: {
++                    perspective: perspective.name,
++                    priorities: perspective.priorities,
++                }
++            });
++
++            const userPrompt = USER_PROMPT_TEMPLATE
++                .replaceAll('{{issues}}', issuesText)
++                .replaceAll('{{context}}', filesContext)
++                .replaceAll('{{perspective_name}}', perspective.name);
++
++            const messages = [
++                createSystemMessage(systemPrompt),
++                createUserMessage(PROMPT_UTILS.verifyPrompt(userPrompt)),
++            ];
++
++            try {
++                const { object: result } = await executeInference({
++                    env: env,
++                    messages,
++                    schema: CodeReviewOutput,
++                    agentActionName: "codeReview",
++                    context: options.inferenceContext,
++                    reasoning_effort: 'low', // Use low effort for specialized reviews
++                });
++                return { perspective: perspective.name, result };
++            } catch (error) {
++                logger.error(`Error in ${perspective.name} review:`, error);
++                return { perspective: perspective.name, result: null };
++            }
++        });
++
++        const perspectiveResults = await Promise.all(perspectivePromises);
++        const validResults = perspectiveResults.filter(r => r.result !== null).map(r => r.result);
++
++        if (validResults.length === 0) {
++            throw new Error("All code review perspectives failed");
++        }
++
++        // 2. Synthesize the results
++        logger.info("Synthesizing multi-perspective results into master review...");
++
++        const synthesisMessages = [
++            createSystemMessage(generalSystemPromptBuilder(SYNTHESIS_SYSTEM_PROMPT, {
+                 query: context.query,
+                 blueprint: context.blueprint,
+                 templateDetails: context.templateDetails,
+                 dependencies: context.dependencies,
+             })),
+-            createUserMessage(userPromptFormatter(issues, filesContext)),
++            createUserMessage(`Here are the individual specialized reviews. Please synthesize them into a single coherent CodeReviewOutput:
++            
++            ${JSON.stringify(perspectiveResults, null, 2)}
++            `),
+         ];
+ 
+         try {
+-            const { object: reviewResult } = await executeInference({
++            const { object: finalReview } = await executeInference({
+                 env: env,
+-                messages,
++                messages: synthesisMessages,
+                 schema: CodeReviewOutput,
+                 agentActionName: "codeReview",
+                 context: options.inferenceContext,
+-                reasoning_effort: issues.runtimeErrors.length || issues.staticAnalysis.lint.issues.length || issues.staticAnalysis.typecheck.issues.length > 0 ? undefined : 'low',
+-                // format: 'markdown'
++                reasoning_effort: 'medium', // Use more effort for synthesis
+             });
+ 
+-            if (!reviewResult) {
+-                throw new Error("Failed to get code review result");
++            if (!finalReview) {
++                throw new Error("Failed to synthesize code review results");
+             }
+-            return reviewResult;
++
++            logger.info(`Code review synthesized successfully. Found issues in ${finalReview.filesToFix.length} files.`);
++            return finalReview;
+         } catch (error) {
+-            logger.error("Error during code review:", error);
++            logger.error("Error during code review synthesis:", error);
++            // Fallback: return the first valid result if synthesis fails
++            if (validResults[0]) {
++                logger.warn("Returning first valid specialized review as fallback due to synthesis failure");
++                return validResults[0] as CodeReviewOutputType;
++            }
+             throw error;
+         }
+     }
+diff --git a/worker/agents/prompts.ts b/worker/agents/prompts.ts
+index 1b5a689..70ecc82 100644
+--- a/worker/agents/prompts.ts
++++ b/worker/agents/prompts.ts
+@@ -14,27 +14,27 @@ export const PROMPT_UTILS = {
+      */
+     replaceTemplateVariables(template: string, variables: Record<string, string>): string {
+         let result = template;
+-        
++
+         for (const [key, value] of Object.entries(variables)) {
+             const placeholder = `{{${key}}}`;
+             result = result.replaceAll(placeholder, value ?? '');
+         }
+-        
++
+         return result;
+     },
+ 
+     serializeTreeNodes(node: FileTreeNode): string {
+         // The output starts with the root node's name.
+         const outputParts: string[] = [node.path.split('/').pop() || node.path];
+-    
++
+         function processChildren(children: FileTreeNode[], prefix: string) {
+             children.forEach((child, index) => {
+                 const isLast = index === children.length - 1;
+                 const connector = isLast ? '└── ' : '├── ';
+                 const displayName = child.path.split('/').pop() || child.path;
+-    
++
+                 outputParts.push(prefix + connector + displayName);
+-    
++
+                 // If the child is a directory with its own children, recurse deeper.
+                 if (child.type === 'directory' && child.children && child.children.length > 0) {
+                     // The prefix for the next level depends on whether the current node
+@@ -44,12 +44,12 @@ export const PROMPT_UTILS = {
+                 }
+             });
+         }
+-    
++
+         // Start the process if the root node has children.
+         if (node.children && node.children.length > 0) {
+             processChildren(node.children, '');
+         }
+-    
++
+         return outputParts.join('\n');
+     },
+ 
+@@ -110,8 +110,8 @@ and provide a preview url for the application.
+                 const errorText = e.message;
+                 // Remove any trace lines with no 'tsx' or 'ts' extension in them
+                 const cleanedText = errorText.split('\n')
+-                                    .map(line => line.includes('/deps/') && !(line.includes('.tsx') || line.includes('.ts')) ? '...' : line)
+-                                    .join('\n');
++                    .map(line => line.includes('/deps/') && !(line.includes('.tsx') || line.includes('.ts')) ? '...' : line)
++                    .join('\n');
+                 // Truncate to 1000 characters to prevent context overflow
+                 return `<error>${cleanedText.slice(0, 1000)}</error>`;
+             });
+@@ -124,7 +124,7 @@ and provide a preview url for the application.
+     serializeStaticAnalysis(staticAnalysis: StaticAnalysisResponse): string {
+         const lintOutput = staticAnalysis.lint?.rawOutput || 'No linting issues detected';
+         const typecheckOutput = staticAnalysis.typecheck?.rawOutput || 'No type checking issues detected';
+-        
++
+         return `**LINT ANALYSIS:**
+ ${lintOutput}
+ 
+@@ -689,7 +689,7 @@ const handleClick = useCallback(() => setCount(prev => prev + 1), []);
+ ⚠️⚠️⚠️ THESE RULES OVERRIDE ALL OTHER CONSIDERATIONS INCLUDING CODE AESTHETICS ⚠️⚠️⚠️
+ ⚠️⚠️⚠️ IF YOU WRITE FORBIDDEN PATTERNS, YOU MUST IMMEDIATELY REWRITE THE FILE ⚠️⚠️⚠️`,
+ 
+-COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
++    COMMON_PITFALLS: `<AVOID COMMON PITFALLS>
+     **TOP 6 MISSION-CRITICAL RULES (FAILURE WILL CRASH THE APP):**
+     1. **DEPENDENCY VALIDATION:** BEFORE writing any import statement, verify it exists in <DEPENDENCIES>. Common failures: @xyflow/react uses { ReactFlow } not default import, @/lib/utils for cn function. If unsure, check the dependency list first.
+     2. **IMPORT & EXPORT INTEGRITY:** Ensure every component, function, or variable is correctly defined and imported properly (and exported properly). Mismatched default/named imports will cause crashes. NEVER write \`import React, 'react';\` - always use \`import React from 'react';\`
+@@ -1218,8 +1218,8 @@ export const STRATEGIES = {
+     **This is a Cloudflare Workers & Durable Objects project. The environment is preconfigured. Absolutely DO NOT Propose changes to wrangler.toml or any other config files. These config files are hidden from you but they do exist.**
+     **The Homepage of the frontend is a dummy page. It should be rewritten as the primary page of the application in the initial phase.**
+     **Refrain from editing any of the 'dont touch' files in the project, e.g - package.json, vite.config.ts, wrangler.jsonc, etc.**
+-</PHASES GENERATION STRATEGY>`, 
+-FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
++</PHASES GENERATION STRATEGY>`,
++    FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
+     **STRATEGY: Scalable, Demoable Frontend and core application First / Iterative Feature Addition later**
+     The project would be developed live: The user (client) would be provided a preview link after each phase. This is our rapid development and delivery paradigm.
+     The core principle is to establish a visually complete and polished frontend presentation early on with core functionalities implemented, before layering in more advanced functionality and fleshing out the backend.
+@@ -1233,17 +1233,18 @@ FRONTEND_FIRST_CODING: `<PHASES GENERATION STRATEGY>
+     ${STRATEGIES_UTILS.CODING_GUIDELINES}
+ 
+     **Make sure to implement all the features and functionality requested by the user and more. The application should be fully complete by the end of the last phase. There should be no compromises**
+-</PHASES GENERATION STRATEGY>`, 
++</PHASES GENERATION STRATEGY>`,
+ }
+ 
+ export interface GeneralSystemPromptBuilderParams {
+-    query: string,
+-    templateDetails: TemplateDetails,
+-    dependencies: Record<string, string>,
+-    blueprint?: Blueprint,
+-    language?: string,
+-    frameworks?: string[],
+-    templateMetaInfo?: TemplateSelection,
++    query: string;
++    templateDetails: TemplateDetails;
++    dependencies: Record<string, string>;
++    blueprint?: Blueprint;
++    language?: string;
++    frameworks?: string[];
++    templateMetaInfo?: TemplateSelection;
++    extraVariables?: Record<string, string>;
+ }
+ 
+ export function generalSystemPromptBuilder(
+@@ -1274,6 +1275,11 @@ export function generalSystemPromptBuilder(
+         variables.usecaseSpecificInstructions = getUsecaseSpecificInstructions(params.templateMetaInfo);
+     }
+ 
++    // Include any extra variables provided
++    if (params.extraVariables) {
++        Object.assign(variables, params.extraVariables);
++    }
++
+     const formattedPrompt = PROMPT_UTILS.replaceTemplateVariables(prompt, variables);
+     return PROMPT_UTILS.verifyPrompt(formattedPrompt);
+ }
+@@ -1281,7 +1287,7 @@ export function generalSystemPromptBuilder(
+ export function issuesPromptFormatter(issues: IssueReport): string {
+     const runtimeErrorsText = PROMPT_UTILS.serializeErrors(issues.runtimeErrors);
+     const staticAnalysisText = PROMPT_UTILS.serializeStaticAnalysis(issues.staticAnalysis);
+-    
++
+     return `## ERROR ANALYSIS PRIORITY MATRIX
+ 
+ ### 1. CRITICAL RUNTIME ERRORS (Fix First - Deployment Blockers)
+@@ -1316,7 +1322,7 @@ export const USER_PROMPT_FORMATTER = {
+                     files.forEach((file) => fileMap.set(file.filePath, file));
+                     const lastPhaseFiles = lastPhase.files.map((file) => fileMap.get(file.path)).filter((file) => file !== undefined);
+                     lastPhaseFilesDiff = lastPhaseFiles.map((file) => file.lastDiff).join('\n');
+-        
++
+                     // Set lastPhase = false for all phases but the last
+                     phases.forEach((phase) => {
+                         if (phase !== lastPhase) {
+@@ -1344,7 +1350,7 @@ ${commandsHistory.join('\n')}
+         };
+ 
+         const prompt = PROMPT_UTILS.replaceTemplateVariables(PROMPT_UTILS.PROJECT_CONTEXT, variables);
+-        
++
+         return PROMPT_UTILS.verifyPrompt(prompt);
+     },
+ };
+@@ -1372,13 +1378,13 @@ const getStyleInstructions = (style: TemplateSelection['styleSelection']): strin
+ - Example Elements: Cartoon-style characters, brushstroke fonts, animated SVGs.
+ - Heading Font options: Playfair Display, Fredericka the Great, Great Vibes
+             `
+-//         case 'Neumorphism':
+-//             return `
+-// **Style Name: Neumorphism (Soft UI)**
+-// - Use a soft pastel background, high-contrast accent colors for functional elements e.g. navy, coral, or bright blue. Avoid monochrome UIs
+-// - Light shadow (top-left) and dark shadow (bottom-right) to simulate extrusion or embedding, Keep shadows subtle but visible to prevent a washed-out look.
+-// - Avoid excessive transparency in text — keep readability high.
+-// - Integrate glassmorphism subtly`;
++        //         case 'Neumorphism':
++        //             return `
++        // **Style Name: Neumorphism (Soft UI)**
++        // - Use a soft pastel background, high-contrast accent colors for functional elements e.g. navy, coral, or bright blue. Avoid monochrome UIs
++        // - Light shadow (top-left) and dark shadow (bottom-right) to simulate extrusion or embedding, Keep shadows subtle but visible to prevent a washed-out look.
++        // - Avoid excessive transparency in text — keep readability high.
++        // - Integrate glassmorphism subtly`;
+         case `Kid_Playful`:
+             return `
+ **Style Name: Kid Playful**
+diff --git a/worker/api/honoAdapter.ts b/worker/api/honoAdapter.ts
+index 3c9c355..8dd266c 100644
+--- a/worker/api/honoAdapter.ts
++++ b/worker/api/honoAdapter.ts
+@@ -15,9 +15,14 @@ type ControllerMethod<T extends BaseController> = (
+     context: RouteContext
+ ) => Promise<Response>;
+ 
++export interface AdaptOptions {
++    requireVerified?: boolean;
++}
++
+ export function adaptController<T extends BaseController>(
+     controller: T,
+-    method: ControllerMethod<T>
++    method: ControllerMethod<T>,
++    options: AdaptOptions = {}
+ ) {
+     return async (c: Context<AppEnv>): Promise<Response> => {
+         const authResult = await enforceAuthRequirement(c);
+@@ -25,6 +30,20 @@ export function adaptController<T extends BaseController>(
+             return authResult;
+         }
+ 
++        // Handle email verification if required
++        if (options.requireVerified) {
++            const user = c.get('user');
++            if (user && !user.emailVerified) {
++                return c.json({
++                    success: false,
++                    error: "EMAIL_UNVERIFIED",
++                    message: "Please verify your email address to access this feature.",
++                    userId: user.id,
++                    email: user.email
++                }, 403);
++            }
++        }
++
+         const routeContext: RouteContext = {
+             user: c.get('user'),
+             sessionId: c.get('sessionId'),
+diff --git a/worker/api/routes/codegenRoutes.ts b/worker/api/routes/codegenRoutes.ts
+index 29ac90d..b9e7a7f 100644
+--- a/worker/api/routes/codegenRoutes.ts
++++ b/worker/api/routes/codegenRoutes.ts
+@@ -3,7 +3,6 @@ import { AppEnv } from '../../types/appenv';
+ import { Hono } from 'hono';
+ import { AuthConfig, setAuthLevel } from '../../middleware/auth/routeAuth';
+ import { adaptController } from '../honoAdapter';
+-import { requireVerified } from '../../middleware/auth/requireVerified';
+ 
+ /**
+  * Setup and configure the application router
+@@ -14,7 +13,7 @@ export function setupCodegenRoutes(app: Hono<AppEnv>): void {
+     // ========================================
+ 
+     // CRITICAL: Create new app - requires full authentication and email verification
+-    app.post('/api/agent', setAuthLevel(AuthConfig.authenticated), requireVerified, adaptController(CodingAgentController, CodingAgentController.startCodeGeneration));
++    app.post('/api/agent', setAuthLevel(AuthConfig.authenticated), adaptController(CodingAgentController, CodingAgentController.startCodeGeneration, { requireVerified: true }));
+ 
+     // ========================================
+     // APP EDITING ROUTES (/chat/:id frontend)
+@@ -22,11 +21,11 @@ export function setupCodegenRoutes(app: Hono<AppEnv>): void {
+ 
+     // WebSocket for app editing - OWNER ONLY (for /chat/:id route)
+     // Only the app owner should be able to connect and modify via WebSocket
+-    app.get('/api/agent/:agentId/ws', setAuthLevel(AuthConfig.ownerOnly), requireVerified, adaptController(CodingAgentController, CodingAgentController.handleWebSocketConnection));
++    app.get('/api/agent/:agentId/ws', setAuthLevel(AuthConfig.ownerOnly), adaptController(CodingAgentController, CodingAgentController.handleWebSocketConnection, { requireVerified: true }));
+ 
+     // Connect to existing agent for editing - OWNER ONLY
+     // Only the app owner should be able to connect for editing purposes
+-    app.get('/api/agent/:agentId/connect', setAuthLevel(AuthConfig.ownerOnly), requireVerified, adaptController(CodingAgentController, CodingAgentController.connectToExistingAgent));
++    app.get('/api/agent/:agentId/connect', setAuthLevel(AuthConfig.ownerOnly), adaptController(CodingAgentController, CodingAgentController.connectToExistingAgent, { requireVerified: true }));
+ 
+-    app.get('/api/agent/:agentId/preview', setAuthLevel(AuthConfig.authenticated), requireVerified, adaptController(CodingAgentController, CodingAgentController.deployPreview));
++    app.get('/api/agent/:agentId/preview', setAuthLevel(AuthConfig.authenticated), adaptController(CodingAgentController, CodingAgentController.deployPreview, { requireVerified: true }));
+ }
+\ No newline at end of file
+diff --git a/worker/api/routes/index.ts b/worker/api/routes/index.ts
+index a434887..4d9bdc4 100644
+--- a/worker/api/routes/index.ts
++++ b/worker/api/routes/index.ts
+@@ -17,6 +17,7 @@ import { setupStatusRoutes } from './statusRoutes';
+ export function setupRoutes(app: Hono<AppEnv>): void {
+     // Health check route
+     app.get('/api/health', (c) => {
++        console.log('Health check called');
+         return c.json({ status: 'ok' });
+     });
+ 
+diff --git a/worker/app.ts b/worker/app.ts
+index 7232904..c8bc318 100644
+--- a/worker/app.ts
++++ b/worker/app.ts
+@@ -9,13 +9,13 @@ import { CsrfService } from './services/csrf/CsrfService';
+ import { SecurityError, SecurityErrorType } from 'shared/types/errors';
+ import { getGlobalConfigurableSettings } from './config';
+ import { AuthConfig, setAuthLevel } from './middleware/auth/routeAuth';
+-// import { initHonoSentry } from './observability/sentry';
++import { initHonoSentry } from './observability/sentry';
+ 
+ export function createApp(env: Env): Hono<AppEnv> {
+     const app = new Hono<AppEnv>();
+ 
+     // Observability: Sentry error reporting & context
+-    // initHonoSentry(app);
++    initHonoSentry(app);
+ 
+     // Apply global security middlewares (skip for WebSocket upgrades)
+     app.use('*', async (c, next) => {
+@@ -27,40 +27,40 @@ export function createApp(env: Env): Hono<AppEnv> {
+         // Apply secure headers
+         return secureHeaders(getSecureHeadersConfig(env))(c, next);
+     });
+-    
++
+     // CORS configuration
+     app.use('/api/*', cors(getCORSConfig(env)));
+-    
++
+     // CSRF protection using double-submit cookie pattern with proper GET handling
+     app.use('*', async (c, next) => {
+         const method = c.req.method.toUpperCase();
+-        
++
+         // Skip for WebSocket upgrades
+         const upgradeHeader = c.req.header('upgrade');
+         if (upgradeHeader?.toLowerCase() === 'websocket') {
+             return next();
+         }
+-        
++
+         try {
+             // Handle GET requests - establish CSRF token if needed
+             if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+                 await next();
+-                
++
+                 // Only set CSRF token for successful API responses
+                 if (c.req.url.startsWith('/api/') && c.res.status < 400) {
+                     await CsrfService.enforce(c.req.raw, c.res);
+                 }
+-                
++
+                 return;
+             }
+-            
++
+             // Validate CSRF token for state-changing requests
+             await CsrfService.enforce(c.req.raw, undefined);
+             await next();
+         } catch (error) {
+             if (error instanceof SecurityError && error.type === SecurityErrorType.CSRF_VIOLATION) {
+-                return new Response(JSON.stringify({ 
+-                    error: { 
++                return new Response(JSON.stringify({
++                    error: {
+                         message: 'CSRF validation failed',
+                         type: SecurityErrorType.CSRF_VIOLATION
+                     }
+@@ -89,6 +89,19 @@ export function createApp(env: Env): Hono<AppEnv> {
+     // Now setup all the routes
+     setupRoutes(app);
+ 
++    // Add global error handler
++    app.onError((err, c) => {
++        console.error('FATAL HONO ERROR:', err);
++        return c.json({
++            success: false,
++            error: {
++                type: 'INTERNAL_SERVER_ERROR',
++                message: err.message || 'An unexpected error occurred',
++                stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
++            }
++        }, 500);
++    });
++
+     // Add not found route to redirect to ASSETS
+     app.notFound((c) => {
+         return c.env.ASSETS.fetch(c.req.raw);
+diff --git a/worker/index.ts b/worker/index.ts
+index 9fa08ee..53a0fd1 100644
+--- a/worker/index.ts
++++ b/worker/index.ts
+@@ -3,32 +3,30 @@ import { SmartCodeGeneratorAgent } from './agents/core/smartGeneratorAgent';
+ import { proxyToSandbox } from '@cloudflare/sandbox';
+ import { isDispatcherAvailable } from './utils/dispatcherUtils';
+ import { createApp } from './app';
+-// import * as Sentry from '@sentry/cloudflare';
+-// import { sentryOptions } from './observability/sentry';
++import * as Sentry from '@sentry/cloudflare';
++import { sentryOptions } from './observability/sentry';
+ import { DORateLimitStore as BaseDORateLimitStore } from './services/rate-limit/DORateLimitStore';
+ import { getPreviewDomain } from './utils/urls';
+ // Durable Object and Service exports
+ export { UserAppSandboxService, DeployerService } from './services/sandbox/sandboxSdkClient';
+ 
+-// export const CodeGeneratorAgent = Sentry.instrumentDurableObjectWithSentry(sentryOptions, SmartCodeGeneratorAgent);
+-// export const DORateLimitStore = Sentry.instrumentDurableObjectWithSentry(sentryOptions, BaseDORateLimitStore);
+-export const CodeGeneratorAgent = SmartCodeGeneratorAgent;
+-export const DORateLimitStore = BaseDORateLimitStore;
++export const CodeGeneratorAgent = Sentry.instrumentDurableObjectWithSentry(sentryOptions, SmartCodeGeneratorAgent);
++export const DORateLimitStore = Sentry.instrumentDurableObjectWithSentry(sentryOptions, BaseDORateLimitStore);
+ 
+ // Logger for the main application and handlers
+ const logger = createLogger('App');
+ 
+ function setOriginControl(env: Env, request: Request, currentHeaders: Headers): Headers {
+-    const previewDomain = env.CUSTOM_DOMAIN
+-    const origin = request.headers.get('Origin');
+-
+-    const allowedOrigin = `https://${previewDomain}`;
+-    if (origin === allowedOrigin) {
+-        currentHeaders.set('Access-Control-Allow-Origin', allowedOrigin);
+-    } else if (origin?.startsWith('http://localhost')) {
+-        currentHeaders.set('Access-Control-Allow-Origin', origin);
+-    }
+-    return currentHeaders;
++	const previewDomain = env.CUSTOM_DOMAIN
++	const origin = request.headers.get('Origin');
++
++	const allowedOrigin = `https://${previewDomain}`;
++	if (origin === allowedOrigin) {
++		currentHeaders.set('Access-Control-Allow-Origin', allowedOrigin);
++	} else if (origin?.startsWith('http://localhost')) {
++		currentHeaders.set('Access-Control-Allow-Origin', origin);
++	}
++	return currentHeaders;
+ }
+ 
+ /**
+@@ -51,19 +49,19 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
+ 	const sandboxResponse = await proxyToSandbox(request, env);
+ 	if (sandboxResponse) {
+ 		logger.info(`Serving response from sandbox for: ${hostname}`);
+-		
++
+ 		// Add headers to identify this as a sandbox response
+ 		let headers = new Headers(sandboxResponse.headers);
+-		
+-        if (sandboxResponse.status === 500) {
+-            headers.set('X-Preview-Type', 'sandbox-error');
+-        } else {
+-            headers.set('X-Preview-Type', 'sandbox');
+-        }
+-        headers = setOriginControl(env, request, headers);
+-        headers.append('Vary', 'Origin');
++
++		if (sandboxResponse.status === 500) {
++			headers.set('X-Preview-Type', 'sandbox-error');
++		} else {
++			headers.set('X-Preview-Type', 'sandbox');
++		}
++		headers = setOriginControl(env, request, headers);
++		headers.append('Vary', 'Origin');
+ 		headers.set('Access-Control-Expose-Headers', 'X-Preview-Type');
+-		
++
+ 		return new Response(sandboxResponse.body, {
+ 			status: sandboxResponse.status,
+ 			statusText: sandboxResponse.statusText,
+@@ -75,7 +73,16 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
+ 	logger.info(`Sandbox miss for ${hostname}, attempting dispatch to permanent worker.`);
+ 	if (!isDispatcherAvailable(env)) {
+ 		logger.warn(`Dispatcher not available, cannot serve: ${hostname}`);
+-		return new Response('This application is not currently available.', { status: 404 });
++		return new Response(JSON.stringify({
++			success: false,
++			error: {
++				message: 'This application is not currently available.',
++				type: 'NOT_FOUND'
++			}
++		}), {
++			status: 404,
++			headers: { 'Content-Type': 'application/json' }
++		});
+ 	}
+ 
+ 	// Extract the app name (e.g., "xyz" from "xyz.build.cloudflare.dev").
+@@ -85,15 +92,15 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
+ 	try {
+ 		const worker = dispatcher.get(appName);
+ 		const dispatcherResponse = await worker.fetch(request);
+-		
++
+ 		// Add headers to identify this as a dispatcher response
+ 		let headers = new Headers(dispatcherResponse.headers);
+-		
++
+ 		headers.set('X-Preview-Type', 'dispatcher');
+-        headers = setOriginControl(env, request, headers);
+-        headers.append('Vary', 'Origin');
++		headers = setOriginControl(env, request, headers);
++		headers.append('Vary', 'Origin');
+ 		headers.set('Access-Control-Expose-Headers', 'X-Preview-Type');
+-		
++
+ 		return new Response(dispatcherResponse.body, {
+ 			status: dispatcherResponse.status,
+ 			statusText: dispatcherResponse.statusText,
+@@ -102,7 +109,17 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
+ 	} catch (error: any) {
+ 		// This block catches errors if the binding doesn't exist or if worker.fetch() fails.
+ 		logger.warn(`Error dispatching to worker '${appName}': ${error.message}`);
+-		return new Response('An error occurred while loading this application.', { status: 500 });
++		return new Response(JSON.stringify({
++			success: false,
++			error: {
++				message: 'An error occurred while loading this application.',
++				type: 'DISPATCH_ERROR',
++				details: error.message
++			}
++		}), {
++			status: 500,
++			headers: { 'Content-Type': 'application/json' }
++		});
+ 	}
+ }
+ 
+@@ -111,56 +128,105 @@ async function handleUserAppRequest(request: Request, env: Env): Promise<Respons
+  */
+ const worker = {
+ 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+-        console.log(`Received request: ${request.method} ${request.url}`);
+-		// --- Pre-flight Checks ---
+-
+-		// 1. Critical configuration check: Ensure custom domain is set.
+-        const previewDomain = getPreviewDomain(env);
+-		if (!previewDomain || previewDomain.trim() === '') {
+-			console.error('FATAL: env.CUSTOM_DOMAIN is not configured in wrangler.toml or the Cloudflare dashboard.');
+-			return new Response('Server configuration error: Application domain is not set.', { status: 500 });
+-		}
+-
+-		const url = new URL(request.url);
+-		const { hostname, pathname } = url;
+-
+-		// 2. Security: Immediately reject any requests made via an IP address.
+-		const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+-		if (ipRegex.test(hostname)) {
+-			return new Response('Access denied. Please use the assigned domain name.', { status: 403 });
+-		}
++		try {
++			console.log(`Received request: ${request.method} ${request.url}`);
++			// --- Pre-flight Checks ---
++
++			// 1. Critical configuration check: Ensure custom domain is set.
++			const previewDomain = getPreviewDomain(env);
++			if (!previewDomain || previewDomain.trim() === '') {
++				console.error('FATAL: env.CUSTOM_DOMAIN is not configured in wrangler.toml or the Cloudflare dashboard.');
++				return new Response(JSON.stringify({
++					success: false,
++					error: {
++						message: 'Server configuration error: Application domain is not set.',
++						type: 'CONFIG_ERROR'
++					}
++				}), {
++					status: 500,
++					headers: { 'Content-Type': 'application/json' }
++				});
++			}
+ 
+-		// --- Domain-based Routing ---
++			const url = new URL(request.url);
++			const { hostname, pathname } = url;
++
++			// 2. Security: Immediately reject any requests made via an IP address.
++			const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
++			if (ipRegex.test(hostname)) {
++				return new Response(JSON.stringify({
++					success: false,
++					error: {
++						message: 'Access denied. Please use the assigned domain name.',
++						type: 'ACCESS_DENIED'
++					}
++				}), {
++					status: 403,
++					headers: { 'Content-Type': 'application/json' }
++				});
++			}
+ 
+-		// Normalize hostnames for both local development (localhost) and production.
+-		const isMainDomainRequest =
+-			hostname === env.CUSTOM_DOMAIN || hostname === 'localhost';
+-		const isSubdomainRequest =
+-			hostname.endsWith(`.${previewDomain}`) ||
+-			(hostname.endsWith('.localhost') && hostname !== 'localhost');
++			// --- Domain-based Routing ---
++
++			// Normalize hostnames for both local development (localhost) and production.
++			const isMainDomainRequest =
++				hostname === env.CUSTOM_DOMAIN ||
++				hostname === 'localhost' ||
++				hostname.endsWith('.workers.dev');
++
++			const isSubdomainRequest =
++				hostname.endsWith(`.${previewDomain}`) ||
++				(hostname.endsWith('.localhost') && hostname !== 'localhost');
++
++			// Route 1: Main Platform Request (e.g., build.cloudflare.dev or localhost)
++			if (isMainDomainRequest) {
++				// Serve static assets for all non-API routes from the ASSETS binding.
++				if (!pathname.startsWith('/api/')) {
++					const response = await env.ASSETS.fetch(request);
++
++					// If asset not found (404), fallback to index.html for SPA routing
++					if (response.status === 404 && !pathname.includes('.')) {
++						const indexRequest = new Request(new URL('/', request.url), request);
++						return env.ASSETS.fetch(indexRequest);
++					}
++
++					return response;
++				}
++				// Handle all API requests with the main Hono application.
++				logger.info(`Handling API request for: ${url}`);
++				const app = createApp(env);
++				return app.fetch(request, env, ctx);
++			}
+ 
+-		// Route 1: Main Platform Request (e.g., build.cloudflare.dev or localhost)
+-		if (isMainDomainRequest) {
+-			// Serve static assets for all non-API routes from the ASSETS binding.
+-			if (!pathname.startsWith('/api/')) {
+-				return env.ASSETS.fetch(request);
++			// Route 2: User App Request (e.g., xyz.build.cloudflare.dev or test.localhost)
++			if (isSubdomainRequest) {
++				return handleUserAppRequest(request, env);
+ 			}
+-			// Handle all API requests with the main Hono application.
+-			logger.info(`Handling API request for: ${url}`);
+-			const app = createApp(env);
+-			return app.fetch(request, env, ctx);
+-		}
+ 
+-		// Route 2: User App Request (e.g., xyz.build.cloudflare.dev or test.localhost)
+-		if (isSubdomainRequest) {
+-			return handleUserAppRequest(request, env);
++			return new Response(JSON.stringify({
++				success: false,
++				error: {
++					message: 'Not Found',
++					type: 'NOT_FOUND'
++				}
++			}), {
++				status: 404,
++				headers: { 'Content-Type': 'application/json' }
++			});
++		} catch (error: any) {
++			console.error('FATAL WORKER ERROR:', error);
++			return new Response(JSON.stringify({
++				success: false,
++				error: {
++					message: error.message || 'Fatal worker error',
++					stack: error.stack
++				}
++			}), {
++				status: 500,
++				headers: { 'Content-Type': 'application/json' }
++			});
+ 		}
+-
+-		return new Response('Not Found', { status: 404 });
+-	},
++	}
+ } satisfies ExportedHandler<Env>;
+ 
+-export default worker;
+-
+-// Wrap the entire worker with Sentry for comprehensive error monitoring.
+-// export default Sentry.withSentry(sentryOptions, worker);
++export default Sentry.withSentry(sentryOptions, worker);
+diff --git a/wrangler.jsonc b/wrangler.jsonc
+index 1d040b0..886177c 100644
+--- a/wrangler.jsonc
++++ b/wrangler.jsonc
+@@ -14,7 +14,7 @@
+         "binding": "CF_VERSION_METADATA"
+     },
+     "assets": {
+-        "directory": "dist",
++        "directory": "dist/client",
+         "not_found_handling": "single-page-application",
+         // "run_worker_first": ["!/src/*", "!/api/docs/*"],
+         "run_worker_first": true,
+@@ -59,17 +59,6 @@
+     "images": {
+         "binding": "IMAGES"
+     },
+-    "containers": [
+-        {
+-            "class_name": "UserAppSandboxService",
+-            "image": "./SandboxDockerfile",
+-            // Altering max_instances value will have no effect. Please use the MAX_SANDBOX_INSTANCES var instead.
+-            "max_instances": 10,
+-            // ATTENTION: Altering instance_type value will have no effect. Please use the SANDBOX_INSTANCE_TYPE var instead.
+-            "instance_type": "standard-3",
+-            "rollout_step_percentage": 100
+-        }
+-    ],
+     "send_email": [
+         {
+             "name": "SEND_EMAIL",
+@@ -80,7 +69,7 @@
+         {
+             "binding": "DB",
+             "database_name": "designai-db",
+-            "database_id": "4abe6cbc-2058-4773-ba54-93b903c0e9f3",
++            "database_id": "3a033d3f-236e-4035-ab92-f0d0771d44b2",
+             "migrations_dir": "migrations",
+             "remote": true
+         }
+@@ -133,27 +122,16 @@
+             "tag": "v2"
+         }
+     ],
+-    "routes": [
+-        {
+-            "pattern": "designai.dev",
+-            "custom_domain": true
+-        },
+-        {
+-            "pattern": "*designai.dev/*",
+-            "custom_domain": false,
+-            "zone_id": "ae4dc91ed6fad145bbb10f3b9bde1a76"
+-        }
+-    ],
+     "vars": {
+         "TEMPLATES_REPOSITORY": "https://github.com/Digital-platoon/designai-templates",
+         "ALLOWED_EMAIL": "anyone can use it",
+-        "DISPATCH_NAMESPACE": "designai-default-namespace",
++        "DISPATCH_NAMESPACE": "",
+         "ENABLE_READ_REPLICAS": "true",
+         "CLOUDFLARE_AI_GATEWAY": "designai-gateway",
+         "MAX_SANDBOX_INSTANCES": "10",
+         "SANDBOX_INSTANCE_TYPE": "standard-3",
+-        "CUSTOM_DOMAIN": "designai.dev"
++        "ENABLE_EMAIL_REGISTRATION": "true"
+     },
+-    "workers_dev": false,
+-    "preview_urls": false
++    "workers_dev": true,
++    "preview_urls": true
+ }
+\ No newline at end of file
+-- 
+2.52.0.windows.1
+

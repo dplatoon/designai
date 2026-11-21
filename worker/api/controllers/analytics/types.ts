@@ -11,9 +11,10 @@ import {
 /**
  * User analytics response data
  */
-export interface UserAnalyticsResponseData extends UserAnalyticsData {}
+export type UserAnalyticsResponseData = UserAnalyticsData;
 
 /**
  * Agent analytics response data
  */
-export interface AgentAnalyticsResponseData extends ChatAnalyticsData {}
+export type AgentAnalyticsResponseData = ChatAnalyticsData;
+

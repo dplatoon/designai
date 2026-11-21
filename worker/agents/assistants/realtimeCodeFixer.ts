@@ -139,7 +139,7 @@ If no issues are found, return a blank response.
 Your final output should consist only of the fixes formatted as shown, without duplicating or rehashing any of the work you did in the code review section.
 {{appendix}}`
 
-const EXTRA_JSX_SPECIFIC =`
+const EXTRA_JSX_SPECIFIC = `
 <appendix>
 The most important class of errors is the "Maximum update depth exceeded" error which you definitely need to identify and fix. 
 ${PROMPT_UTILS.REACT_RENDER_LOOP_PREVENTION}
@@ -191,7 +191,7 @@ ${issues.join('\n')}
 </issues>` : '',
         appendix: (file.filePath.endsWith('.tsx') || file.filePath.endsWith('.jsx')) ? EXTRA_JSX_SPECIFIC : ''
     };
-    
+
     const prompt = PROMPT_UTILS.replaceTemplateVariables(user_prompt, variables);
     return PROMPT_UTILS.verifyPrompt(prompt);
 }
@@ -244,7 +244,7 @@ export class RealtimeCodeFixer extends Assistant<Env> {
                 this.logger.info(`Skipping realtime code fixer for file: ${generatedFile.filePath}`);
                 return generatedFile;
             }
-            
+
             let content = generatedFile.fileContents;
 
             this.save([createSystemMessage(this.systemPrompt)]);
@@ -258,8 +258,8 @@ export class RealtimeCodeFixer extends Assistant<Env> {
                 // issues = [...issues, ...analysis.issues.map(issue => JSON.stringify(issue, null, 2))];
                 this.logger.info(`Running realtime code fixer for file: ${generatedFile.filePath} (pass ${i + 1}/${passes}), issues: ${JSON.stringify(issues, null, 2)}`);
                 const messages = this.save([
-                    i === 0 ? createUserMessage(userPromptFormatter(this.userPrompt, context.query, generatedFile, context.previousFiles, currentPhase, issues)) : 
-                    createUserMessage(`
+                    i === 0 ? createUserMessage(userPromptFormatter(this.userPrompt, context.query, generatedFile, context.previousFiles, currentPhase, issues)) :
+                        createUserMessage(`
 Please quickly re-review the entire code for another pass to ensure there are no **critical** issues or bugs remaining and there are no weird unapplied changes or residues (e.g, malformed search/replace blocks or diffs).
 **Look out for serious issues that can cause runtime errors, rendering issues, logical bugs, or things that got broken by previous fixes**
 **Indentations do not cause issues, Please ignore indentation issues**
@@ -309,7 +309,7 @@ Don't be nitpicky, If there are no actual issues, just say "No issues found".
                     searchBlocks = 0;
                     continue;
                 }
-                
+
                 // Search the number of search blocks in fixResult
                 searchBlocks = fixResult.string.match(/<<<\s+SEARCH/g)?.length ?? 0;
 
@@ -349,8 +349,8 @@ ${content}
      * Simple approach: applies diff, if blocks fail, gives all failed blocks to LLM to fix
      */
     async applyDiffSafely(
-        originalContent: string, 
-        originalDiff: string, 
+        originalContent: string,
+        originalDiff: string,
         maxRetries: number = MAX_RETRIES
     ): Promise<string> {
         if (!originalContent || !originalDiff?.trim()) {
@@ -359,20 +359,20 @@ ${content}
         }
 
         this.logger.info('Starting smart diff application...');
-        
+
         try {
             let currentContent = originalContent;
             let currentDiff = originalDiff;
 
             for (let attempt = 0; attempt <= maxRetries; attempt++) {
-                currentDiff = currentDiff.replaceAll(/^={7}\s*$\n^`{3}\s*$/gm, '>>>>>>> REPLACE\n\`\`\`\n')         // A hack cuz LLM often returns =7 and `3 instead of >>>>> REPLACE
+                currentDiff = currentDiff.replaceAll(/^={7}\s*$\n^`{3}\s*$/gm, '>>>>>>> REPLACE\n```\n')         // A hack cuz LLM often returns =7 and `3 instead of >>>>> REPLACE
                 const searchBlocks = currentDiff.match(/<<<\s+SEARCH/g)?.length ?? 0;
                 const replaceBlocks = currentDiff.match(/\s+REPLACE/g)?.length ?? 0;
                 if (searchBlocks !== replaceBlocks) {
                     this.logger.warn(`Realtime code fixer returned mismatched search and replace blocks for file, ${searchBlocks} search blocks and ${replaceBlocks} replace blocks`);
-                    
+
                     const correctedDiff = await this.getLLMCorrectedDiff(
-                        currentContent, 
+                        currentContent,
                         [],
                         [`Mismatched search and replace blocks in current diff: ${searchBlocks} search blocks and ${replaceBlocks} replace blocks. Current diff: \n${currentDiff}`],
                         0
@@ -425,9 +425,9 @@ ${currentDiff}
 
                 // Ask LLM to fix all failed blocks
                 this.logger.info(`🔄 Getting LLM correction for ${blocksFailed} failed blocks...`);
-                
+
                 const correctedDiff = await this.getLLMCorrectedDiff(
-                    currentContent, 
+                    currentContent,
                     failedBlocks,
                     result.results.errors,
                     blocksApplied
@@ -461,7 +461,7 @@ ${currentDiff}
     ): Promise<string | null> {
         try {
             // Format the failed blocks in the expected format for the new prompt
-            const failedBlocksText = failedBlocks.map((block) => 
+            const failedBlocksText = failedBlocks.map((block) =>
                 `## SearchReplaceNoExactMatch: This SEARCH block failed to exactly match lines in the file
 <<<<<<< SEARCH
 ${block.search}
@@ -473,8 +473,8 @@ ${block.error}
 `).join('\n\n');
 
             // Format all errors as additional context
-            const allErrorsText = allErrors.length > 0 ? 
-                `\n\nAll cumulative errors from diff application:\n${allErrors.map(err => `- ${err}`).join('\n')}` : 
+            const allErrorsText = allErrors.length > 0 ?
+                `\n\nAll cumulative errors from diff application:\n${allErrors.map(err => `- ${err}`).join('\n')}` :
                 '';
 
             // Use the new simplified DIFF_FIXER prompt
@@ -487,8 +487,8 @@ ${block.error}
 
             this.logger.info(`Getting corrected diff from LLM...${failedBlocksText}`);
 
-            const messages = this.save([createUserMessage(diffFixerPrompt)]); 
-            
+            const messages = this.save([createUserMessage(diffFixerPrompt)]);
+
             const llmResponse = await infer({
                 env: this.env,
                 metadata: this.inferenceContext,
@@ -496,7 +496,7 @@ ${block.error}
                 reasoning_effort: 'low',
                 temperature: 0.0,
                 maxTokens: 10000,
-                actionKey:'realtimeCodeFixer',
+                actionKey: 'realtimeCodeFixer',
                 messages,
             });
 
@@ -510,11 +510,11 @@ ${block.error}
 
             // The new prompt returns corrected diff directly without XML tags
             const trimmed = llmResponse.string.trim();
-            
+
             // Count blocks for validation
             const searchCount = (trimmed.match(/<<<<<<< SEARCH/g) || []).length;
             const replaceCount = (trimmed.match(/>>>>>>> REPLACE/g) || []).length;
-            
+
             if (searchCount !== replaceCount) {
                 this.logger.warn(`❌ Mismatched markers: ${searchCount} SEARCH vs ${replaceCount} REPLACE`, trimmed);
                 return null;
@@ -541,7 +541,7 @@ export function IsRealtimeCodeFixerEnabled(inferenceContext: InferenceContext): 
         console.log("Realtime code fixer enabled");
         return true;
     }
-    
+
     if (inferenceContext.userModelConfigs?.['realtimeCodeFixer'] && inferenceContext.userModelConfigs['realtimeCodeFixer'].name !== AIModels.DISABLED) {
         console.log("Realtime code fixer enabled by user");
         return true;
@@ -550,4 +550,3 @@ export function IsRealtimeCodeFixerEnabled(inferenceContext: InferenceContext): 
     console.log("Realtime code fixer disabled", inferenceContext.userModelConfigs);
     return false;
 }
-    

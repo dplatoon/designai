@@ -90,7 +90,7 @@ export default function AppsPage() {
 								onChange={handleVisibilityChange}
 							/>
 						</div>
-						
+
 						<div className="flex items-start gap-4 justify-between">
 							{/* Search and Filters */}
 							<AppFiltersForm
@@ -113,7 +113,7 @@ export default function AppsPage() {
 								onValueChange={(v) => {
 									handleSortChange(v);
 									// Persist to URL and localStorage
-									try { localStorage.setItem('apps.sort', v); } catch {}
+									try { localStorage.setItem('apps.sort', v); } catch { /* localStorage unavailable */ }
 									const next = new URLSearchParams(searchParams);
 									next.set('sort', v);
 									setSearchParams(next, { replace: true });
@@ -142,16 +142,16 @@ export default function AppsPage() {
 						infiniteScroll={true}
 						emptyState={
 							!searchQuery &&
-							filterFramework === 'all' &&
-							filterVisibility === 'all' &&
-							sortBy === 'recent' &&
-							totalCount === 0
+								filterFramework === 'all' &&
+								filterVisibility === 'all' &&
+								sortBy === 'recent' &&
+								totalCount === 0
 								? {
-										title: 'No apps yet',
-										description:
-											'Start building your first app with AI assistance.',
-										action: <div></div>,
-									}
+									title: 'No apps yet',
+									description:
+										'Start building your first app with AI assistance.',
+									action: <div></div>,
+								}
 								: undefined
 						}
 					/>

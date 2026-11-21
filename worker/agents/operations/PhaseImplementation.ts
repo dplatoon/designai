@@ -25,7 +25,7 @@ export interface PhaseImplementationInputs {
     fileClosedCallback: (file: FileOutputType, message: string) => void
 }
 
-export interface PhaseImplementationOutputs{
+export interface PhaseImplementationOutputs {
     // rawFiles: FileOutputType[]
     fixedFilePromises: Promise<FileOutputType>[]
     deploymentNeeded: boolean
@@ -391,7 +391,7 @@ The README should be professional, well-structured, and provide clear instructio
 - Include setup/installation instructions using bun (not npm/yarn)
 - Add usage examples and development instructions
 - Include a deployment section with Cloudflare-specific instructions
-- **IMPORTANT**: Add a \`[cloudflarebutton]\` placeholder near the top and another in the deployment section for the Cloudflare deploy button. Write the **EXACT** string except the backticks and DON'T enclose it in any other button or anything. We will replace it with https://deploy.workers.cloudflare.com/?url=\${repositoryUrl\} when the repository is created.
+- **IMPORTANT**: Add a \`[cloudflarebutton]\` placeholder near the top and another in the deployment section for the Cloudflare deploy button. Write the **EXACT** string except the backticks and DON'T enclose it in any other button or anything. We will replace it with https://deploy.workers.cloudflare.com/?url=\${repositoryUrl} when the repository is created.
 - Structure the content clearly with appropriate headers and sections
 - Be concise but comprehensive - focus on essential information
 - Use professional tone suitable for open source projects
@@ -406,7 +406,7 @@ const formatUserSuggestions = (suggestions?: string[] | null): string => {
     if (!suggestions || suggestions.length === 0) {
         return '';
     }
-    
+
     return `
 <USER SUGGESTIONS>
 The following client suggestions and feedback have been provided, relayed by our client conversation agent.
@@ -429,7 +429,7 @@ const userPromptFormatter = (phaseConcept: PhaseConceptType, issues: IssueReport
         phaseConcept,
         PhaseConceptSchema
     );
-    
+
     const prompt = PROMPT_UTILS.replaceTemplateVariables(specialPhasePromptOverrides[phaseConcept.name] || USER_PROMPT, {
         phaseText,
         issues: issuesPromptFormatter(issues),
@@ -445,14 +445,14 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
     ): Promise<PhaseImplementationOutputs> {
         const { phase, issues, userContext } = inputs;
         const { env, logger, context } = options;
-        
+
         logger.info(`Generating files for phase: ${phase.name}`, phase.description, "files:", phase.files.map(f => f.path));
-    
+
         // Notify phase start
         const codeGenerationFormat = new SCOFFormat();
         // Build messages for generation
         const messages = getSystemPromptWithProjectContext(SYSTEM_PROMPT, context, CodeSerializerType.SCOF);
-        
+
         // Create user message with optional images
         const userPrompt = userPromptFormatter(phase, issues, userContext?.suggestions) + codeGenerationFormat.formatInstructions();
         const userMessage = userContext?.images && userContext.images.length > 0
@@ -462,16 +462,16 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
                 'high'
             )
             : createUserMessage(userPrompt);
-        
+
         messages.push(userMessage);
-    
+
         // Initialize streaming state
         const streamingState: CodeGenerationStreamingState = {
             accumulator: '',
             completedFiles: new Map(),
             parsingState: {} as SCOFParsingState
         };
-    
+
         const fixedFilePromises: Promise<FileOutputType>[] = [];
 
         let modelConfig = AGENT_CONFIG.phaseImplementation;
@@ -480,7 +480,7 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
         }
 
         const shouldEnableRealtimeCodeFixer = inputs.shouldAutoFix && IsRealtimeCodeFixerEnabled(options.inferenceContext);
-    
+
         // Execute inference with streaming
         await executeInference({
             env: env,
@@ -511,7 +511,7 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
                                 logger.error(`Completed file not found: ${filePath}`);
                                 return;
                             }
-    
+
                             // Process the file contents
                             const originalContents = context.allFiles.find(f => f.filePath === filePath)?.fileContents || '';
                             completedFile.fileContents = FileProcessing.processGeneratedFileContents(
@@ -519,12 +519,12 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
                                 originalContents,
                                 logger
                             );
-    
+
                             const generatedFile: FileOutputType = {
                                 ...completedFile,
                                 filePurpose: FileProcessing.findFilePurpose(
-                                    filePath, 
-                                    phase, 
+                                    filePath,
+                                    phase,
                                     context.allFiles.reduce((acc, f) => ({ ...acc, [f.filePath]: f }), {})
                                 )
                             };
@@ -533,7 +533,7 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
                                 // Call realtime code fixer immediately - this is the "realtime" aspect
                                 const realtimeCodeFixer = new RealtimeCodeFixer(env, options.inferenceContext);
                                 const fixPromise = realtimeCodeFixer.run(
-                                    generatedFile, 
+                                    generatedFile,
                                     {
                                         // previousFiles: previousFiles,
                                         query: context.query,
@@ -545,7 +545,7 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
                             } else {
                                 fixedFilePromises.push(Promise.resolve(generatedFile));
                             }
-    
+
                             inputs.fileClosedCallback(generatedFile, `Completed generation of ${filePath}`);
                         }
                     );
@@ -558,7 +558,7 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
         const commands = streamingState.parsingState.extractedInstallCommands;
 
         logger.info("Files generated for phase:", phase.name, "with", fixedFilePromises.length, "files being fixed in real-time and extracted install commands:", commands);
-    
+
         // Return generated files for validation and deployment
         return {
             fixedFilePromises,
@@ -572,7 +572,7 @@ export class PhaseImplementationOperation extends AgentOperation<PhaseImplementa
         logger.info("Generating README.md for the project");
 
         try {
-            let readmePrompt = README_GENERATION_PROMPT;
+            const readmePrompt = README_GENERATION_PROMPT;
             const messages = [...getSystemPromptWithProjectContext(SYSTEM_PROMPT, context, CodeSerializerType.SCOF), createUserMessage(readmePrompt)];
 
             const results = await executeInference({
