@@ -4,7 +4,7 @@
  */
 {
   // "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "designai",
+  "name": "designaidev",
   "main": "worker/index.ts",
   "compatibility_date": "2026-03-12",
   "compatibility_flags": [
@@ -81,7 +81,7 @@
     {
       "binding": "DB",
       "database_name": "designai-db",
-      "database_id": "4abe6cbc-2058-4773-ba54-93b903c0e9f3",
+      "database_id": "3a033d3f-236e-4035-ab92-f0d0771d44b2",
       "migrations_dir": "migrations",
       "remote": true
     }
